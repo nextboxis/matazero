@@ -1,0 +1,31 @@
+{
+  "dataset_version": "2026.08.1-geonames-admin",
+  "places": [
+    {"name": "London", "country": "United Kingdom", "admin1": "England", "lat": 51.5074, "lon": -0.1278, "timezone": "Europe/London"},
+    {"name": "Paris", "country": "France", "admin1": "Île-de-France", "lat": 48.8566, "lon": 2.3522, "timezone": "Europe/Paris"},
+    {"name": "Berlin", "country": "Germany", "admin1": "Berlin", "lat": 52.5200, "lon": 13.4050, "timezone": "Europe/Berlin"},
+    {"name": "Rome", "country": "Italy", "admin1": "Lazio", "lat": 41.9028, "lon": 12.4964, "timezone": "Europe/Rome"},
+    {"name": "Madrid", "country": "Spain", "admin1": "Madrid", "lat": 40.4168, "lon": -3.7038, "timezone": "Europe/Madrid"},
+    {"name": "Kyiv", "country": "Ukraine", "admin1": "Kyiv", "lat": 50.4501, "lon": 30.5234, "timezone": "Europe/Kyiv"},
+    {"name": "New York City", "country": "United States", "admin1": "New York", "lat": 40.7128, "lon": -74.0060, "timezone": "America/New_York"},
+    {"name": "Washington, D.C.", "country": "United States", "admin1": "District of Columbia", "lat": 38.9072, "lon": -77.0369, "timezone": "America/New_York"},
+    {"name": "San Francisco", "country": "United States", "admin1": "California", "lat": 37.7749, "lon": -122.4194, "timezone": "America/Los_Angeles"},
+    {"name": "Los Angeles", "country": "United States", "admin1": "California", "lat": 34.0522, "lon": -118.2437, "timezone": "America/Los_Angeles"},
+    {"name": "Chicago", "country": "United States", "admin1": "Illinois", "lat": 41.8781, "lon": -87.6298, "timezone": "America/Chicago"},
+    {"name": "Toronto", "country": "Canada", "admin1": "Ontario", "lat": 43.6532, "lon": -79.3832, "timezone": "America/Toronto"},
+    {"name": "Tokyo", "country": "Japan", "admin1": "Tokyo", "lat": 35.6762, "lon": 139.6503, "timezone": "Asia/Tokyo"},
+    {"name": "Seoul", "country": "South Korea", "admin1": "Seoul", "lat": 37.5665, "lon": 126.9780, "timezone": "Asia/Seoul"},
+    {"name": "Beijing", "country": "China", "admin1": "Beijing", "lat": 39.9042, "lon": 116.4074, "timezone": "Asia/Shanghai"},
+    {"name": "Singapore", "country": "Singapore", "admin1": "Singapore", "lat": 1.3521, "lon": 103.8198, "timezone": "Asia/Singapore"},
+    {"name": "Sydney", "country": "Australia", "admin1": "New South Wales", "lat": -33.8688, "lon": 151.2093, "timezone": "Australia/Sydney"},
+    {"name": "Melbourne", "country": "Australia", "admin1": "Victoria", "lat": -37.8136, "lon": 144.9631, "timezone": "Australia/Melbourne"},
+    {"name": "Mumbai", "country": "India", "admin1": "Maharashtra", "lat": 19.0760, "lon": 72.8777, "timezone": "Asia/Kolkata"},
+    {"name": "New Delhi", "country": "India", "admin1": "Delhi", "lat": 28.6139, "lon": 77.2090, "timezone": "Asia/Kolkata"},
+    {"name": "Bengaluru", "country": "India", "admin1": "Karnataka", "lat": 12.9716, "lon": 77.5946, "timezone": "Asia/Kolkata"},
+    {"name": "Dubai", "country": "United Arab Emirates", "admin1": "Dubai", "lat": 25.2048, "lon": 55.2708, "timezone": "Asia/Dubai"},
+    {"name": "Cairo", "country": "Egypt", "admin1": "Cairo", "lat": 30.0444, "lon": 31.2357, "timezone": "Africa/Cairo"},
+    {"name": "Johannesburg", "country": "South Africa", "admin1": "Gauteng", "lat": -26.2041, "lon": 28.0473, "timezone": "Africa/Johannesburg"},
+    {"name": "São Paulo", "country": "Brazil", "admin1": "São Paulo", "lat": -23.5505, "lon": -46.6333, "timezone": "America/Sao_Paulo"},
+    {"name": "Buenos Aires", "country": "Argentina", "admin1": "Buenos Aires", "lat": -34.6037, "lon": -58.3816, "timezone": "America/Argentina/Buenos_Aires"}
+  ]
+}

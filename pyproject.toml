@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "matazero"
+version = "2.0.0"
+description = "Evidence-grade, ethical image intelligence toolkit for OSINT and digital forensics"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    {name = "Saranya", email = "saranya@example.com"}
+]
+keywords = ["forensics", "osint", "image-analysis", "metadata", "exif", "steganography", "chain-of-custody"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Information Technology",
+    "Topic :: Security",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "click>=8.0.0",
+    "rich>=12.0.0",
+    "pillow>=9.0.0",
+    "numpy>=1.20.0",
+    "imagehash>=4.2.0",
+    "cryptography>=3.4.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+matazero = "imgint.cli.main:cli"
+mata = "imgint.cli.main:cli"
+imgint = "imgint.cli.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["imgint*", "matazero*", "mata*"]
+
+[tool.setuptools.package-data]
+"imgint.core.data" = ["*.json", "*.db"]
