@@ -205,17 +205,7 @@ Per **GR-3.1 through GR-3.8** and `docs/ETHICS.md`, the following mass surveilla
 
 ---
 
-## 8. Running Tests
-
-Execute the comprehensive 29-test suite covering governance, parsing, fingerprinting, sandboxing, payload carving, C2PA, HTML dossier, authenticity verdicts, and CLI workflows:
-
-```bash
-python -m pytest tests/ -v
-```
-
----
-
-## 9. Documentation
+## 8. Documentation
 
 * [PRD (Product Requirements Document)](plan/PRD.md)
 * [SRD (Software Requirements Document)](plan/SRD.md)
@@ -226,6 +216,6 @@ python -m pytest tests/ -v
 
 ---
 
-## 10. License
+## 9. License
 
 Licensed under the **Apache 2.0 License**. See [LICENSE](LICENSE) for details.

@@ -28,12 +28,6 @@ dependencies = [
     "cryptography>=3.4.0",
 ]
 
-[project.optional-dependencies]
-test = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-]
-
 [project.scripts]
 matazero = "imgint.cli.main:cli"
 mata = "imgint.cli.main:cli"

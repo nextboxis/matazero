@@ -59,6 +59,5 @@ mata/
 │   ├── sample_scope.json        # Example signed scope file
 │   └── README.md                # Sample usage instructions
 ├── plan/                        # Engineering blueprints (PRD, SRD, SRS, ARCHITECTURE, PLAN)
-├── docs/                        # Security & ethics policies
-└── tests/                       # Complete 25-test verification suite
+└── docs/                        # Security & ethics policies
 ```
