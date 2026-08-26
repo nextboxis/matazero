@@ -1,102 +1,97 @@
-# matazero (imgint)
+# matazero
 
-> **Evidence-Grade, Ethical Image Intelligence Toolkit for OSINT and Digital Forensics**
+**Image Intelligence & Forensic Analysis Toolkit for OSINT and Digital Forensics**
 
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-21%2F21%20passing-brightgreen.svg)](tests/)
-[![Security Architecture](https://img.shields.io/badge/sandbox-isolated%20decode-orange.svg)](docs/SECURITY.md)
+[![OPSEC](https://img.shields.io/badge/opsec-100%25%20offline-success.svg)](docs/SECURITY.md)
 [![Governance](https://img.shields.io/badge/governance-hash--chained%20audit-blueviolet.svg)](docs/ETHICS.md)
-[![Offline First](https://img.shields.io/badge/opsec-100%25%20offline-success.svg)](docs/SECURITY.md)
 
 ---
 
-## 1. Overview
+## What is matazero?
 
-**matazero** extracts every recoverable signal from an image file — metadata blocks, encoder fingerprints, embedded artefacts, trailing data, and content-derived analytics — and correlates them into an evidence-grade report with per-finding provenance, confidence ratings, and contextual caveats.
+**matazero** is an image forensics tool designed to recover every piece of data from an image file — including metadata, hardware encoder fingerprints, embedded previews, and hidden trailing payloads. It produces detailed forensic reports with confidence ratings and tamper analysis.
 
-Built for verification journalists, DFIR analysts, security researchers, and privacy-conscious individuals, **matazero** bridges the gap between raw metadata extraction and responsible forensic interpretation.
+Even when social media platforms strip EXIF metadata, `matazero` analyzes the underlying JPEG compression structures (quantization tables, Huffman tables, subsampling ratios) to match the file against known camera hardware and editing software profiles.
 
 ```
 ┌───────────────────────────────┐
-│     Lawfully Held Image       │
+│     Evidence Image File       │
 └───────────────┬───────────────┘
                 │
                 ▼
 ┌───────────────────────────────┐      ┌───────────────────────────────┐
-│       matazero Pipeline       │ ◄─── │      Authorization Scope      │
-│  7-Tier Extraction & Analysis │      │ Case ID · Legal Basis · Hash  │
+│       matazero Engine         │ ◄─── │      Authorization Scope      │
+│  7-Tier Extraction Pipeline   │      │ Case ID · Legal Basis · HMAC  │
 └───────────────┬───────────────┘      └───────────────────────────────┘
                 │
         ┌───────┴───────────────────────────────┐
         ▼                                       ▼
 ┌───────────────────────────────┐       ┌───────────────────────────────┐
-│    Evidence-Grade Report      │       │     Append-Only Audit Log     │
-│ Confidence · Caveats · Proof  │       │ Hash-Chained JSONL (SHA-256)  │
+│   Evidence Dossier / Report   │       │     Audit Log Trail           │
+│ Text · JSON · HTML · Hashes   │       │ Hash-Chained JSONL (SHA-256)  │
 └───────────────────────────────┘       └───────────────────────────────┘
 ```
 
 ---
 
-## 2. Key Differentiators
+## Key Features
 
-* **Attribution from Stripped Images (Tier 2)**: Major platforms strip EXIF metadata on upload. `matazero` inspects surviving structural signatures — Quantization Tables (`DQT`), Huffman Tables (`DHT`), chroma subsampling (`SOF`), and segment ordering — matching them against a reference corpus to identify camera models and re-encoding software.
-* **Structural Sandbox Isolation (ADR-004)**: Pixel decoding is quarantined in an isolated, resource-capped subprocess. Host systems remain protected against image decoder CVEs (such as `libwebp` CVE-2023-4863 and `libjpeg-turbo` exploits).
-* **Mandatory Uncertainty & No Verdicts (ADR-008)**: Forensics tools that output boolean `"manipulated: true"` cause severe harm. `matazero` requires confidence levels (`observed`, `derived`, `indicative`, `inconclusive`) and contextual caveat text on every derived assertion.
-* **Cryptographic Chain of Custody (GR-2.x)**: Input files are hashed on ingest and kept strictly read-only. Operations run on isolated working copies, and original hashes are verified on completion (Exit code 7 on mismatch).
-* **100% Offline OPSEC (ADR-005)**: Zero telemetry, zero external network requests by default. Reverse geocoding runs entirely offline against a local bundled dataset (`geonames_offline.json`).
+* **Attribution Without Metadata**: Reconstructs encoder profiles from raw quantization tables (`DQT`), Huffman tables (`DHT`), and chroma subsampling (`SOF`) against a database of 22+ smartphone, DSLR, social media, and AI generator fingerprints.
+* **Camera Fingerprint Learning**: Learn and save custom device signatures directly into your local corpus (`matazero corpus learn`).
+* **Interactive Standalone HTML Dossier**: Generates a self-contained, air-gapped HTML report (`-f html`) with an interactive SVG solar compass dial and structural byte map.
+* **Automatic Payload Carver**: Detects and extracts hidden trailing archives (ZIP, RAR, 7z, TAR, GZ, Executables) appended past the image end marker (`-c` / `--carve`).
+* **Multi-Format Container Walk**: Inspects segment structures for JPEG, PNG, TIFF/RAW (DNG, CR2, NEF, ARW, RAF), animated GIF, WebP, and ISO-BMFF (HEIC/AVIF).
+* **Process Isolation Sandbox**: Quarantines pixel decoding inside a restricted subprocess to protect the host system against malicious image parser exploits.
+* **Chain of Custody & Audit Logging**: Cryptographically verifies evidence integrity using SHA-256 hashing and append-only hash-chained audit logs.
+* **100% Offline & Private**: Zero telemetry, zero cloud dependencies. Solar calculations and reverse geocoding run entirely local.
 
 ---
 
-## 3. The 7 Extraction Tiers
+## The 7 Extraction Tiers
 
-| Tier | Category | Key Signals Extracted & Analyzed |
+| Tier | Name | What it Extracts |
 |:---:|---|---|
-| **Tier 1** | **Metadata Blocks** | EXIF 2.32 (IFD0, SubIFD, GPS, Interop, IFD1), safe entity-disabled XMP RDF/XML, IPTC-IIM (8BIM), multi-part ICC profiles, C2PA/JUMBF manifests, and PNG native text chunks (`tEXt`, `zTXt`, `iTXt`, `tIME`, `pHYs`). |
-| **Tier 2** | **Encoder Fingerprints** | JPEG `DQT` quantization table extraction, IJG quality estimation (1–100), `DHT` Huffman table classification (default vs. custom/optimized), chroma subsampling (4:4:4, 4:2:2, 4:2:0), segment sequence, and reference corpus matching. |
-| **Tier 3** | **Embedded Artefacts** | IFD1 thumbnail extraction, aspect ratio mismatch (crop indicator), MPF secondary pictures / depth maps, and trailing data detection past `FFD9`/`IEND` with Shannon entropy & signature classification (ZIP, RAR, EXE, script). |
-| **Tier 4** | **Cryptographic Hashes** | Whole-file SHA-256, pure image datastream SHA-256 (excluding metadata blocks to detect metadata-only edits), and perceptual hashes (aHash, dHash, pHash) flagged as corpus-internal only. |
-| **Tier 5** | **Geospatial & Temporal** | Signed decimal GPS degrees, altitude, DOP, offline reverse geocoding via bundled GeoNames index, NOAA solar azimuth/elevation chronolocation, and temporal cross-checks (`DateTimeOriginal` vs. `GPSDateStamp`, timezone vs. longitude). |
-| **Tier 6** | **Forensic Indicators** | Metadata timeline contradictions, quantization inconsistency, Error Level Analysis (ELA, opt-in via `--ela`), and metadata absence reporting (normal platform behavior vs anomaly). Refuses score aggregation. |
-| **Tier 7** | **Content-Derived Signals** | Sandboxed pixel decoding for image dimensions, aspect ratio, dominant color palette extraction, and LSB entropy screening. |
+| **Tier 1** | **Metadata Blocks** | EXIF 2.32, XMP (safe entity-disabled), IPTC-IIM (8BIM), ICC color profiles, PNG text chunks, and C2PA authenticity manifests. |
+| **Tier 2** | **Encoder Fingerprints** | JPEG `DQT` quantization tables, estimated quality factor (1–100), `DHT` Huffman tables, chroma subsampling (4:4:4, 4:2:2, 4:2:0), segment sequence, and hardware corpus matching. |
+| **Tier 3** | **Embedded Artefacts** | IFD1 embedded thumbnails, MPF multi-picture frames, and trailing data past EOI/IEND with entropy analysis. |
+| **Tier 4** | **Cryptographic Hashes** | Whole-file SHA-256, pure image data-stream SHA-256 (excludes metadata to detect re-tagging), and perceptual hashes (aHash, dHash, pHash). |
+| **Tier 5** | **Geospatial & Temporal** | GPS coordinates, altitude, offline GeoNames reverse geocoding, NOAA solar azimuth/elevation chronolocation, and timestamp consistency checks. |
+| **Tier 6** | **Forensic Indicators & Verdicts** | Ground-truth authenticity verdicts, timeline inversions (`ModifyDate` vs `DateTimeOriginal`), Error Level Analysis (ELA via `--ela`), and metadata absence analysis. |
+| **Tier 7** | **Content-Derived Signals** | Sandboxed image dimensions, aspect ratio, dominant color palette approximation, and LSB entropy screening. |
 
 ---
 
-## 4. Installation
+## Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/nextboxis/matazero.git
+cd matazero
+
 # Install in editable mode
 pip install -e .
-
-# Or install optional test dependencies
-pip install -e ".[test]"
 ```
 
-### Running the Tool:
+### Running the Tool
 
-You can run **matazero** in any of the following ways:
+You can invoke `matazero` via any of the following:
 
 ```bash
-# 1. As a Python module (Recommended, works in any terminal environment)
+# Recommended (works in any terminal)
 python -m matazero --help
-python -m mata --help
 
-# 2. As a direct script
-python matazero.py --help
-
-# 3. As a global CLI binary (ensure Python Scripts folder is in your PATH)
+# Global CLI command (if Python Scripts is in your PATH)
 matazero --help
-mata --help
 ```
 
 ---
 
-## 5. Quickstart & CLI Reference
+## CLI Reference & Quickstart
 
-```
-matazero <command> [flags] [targets...]
+```text
+matazero <command> [options] [targets...]
 
 Commands:
   scope       Create, validate, or display an authorization scope
@@ -108,114 +103,113 @@ Commands:
   completion  Generate shell completion scripts (bash, zsh, fish)
 ```
 
-### 5.1 Command Overview
+### Common Usage Examples
 
 ```bash
-matazero scope       # Create, validate, or display an authorization scope
-matazero analyze     # Run 7 extraction tiers over evidence files
-matazero probe       # Dump container segment and chunk structure with byte offsets
-matazero corpus      # List known camera profiles or learn from new reference images
-matazero audit       # Verify or export the tamper-evident audit log
-matazero clean       # Losslessly remove metadata in self-audit mode
-matazero completion  # Generate shell completion scripts (bash, zsh, fish)
-```
+# 1. Quick analysis on an image (Self-Audit mode for personal files)
+python -m matazero analyze photo.jpg -a
 
-### 5.2 Quick Examples & Short Flags
+# 2. Generate an interactive standalone HTML dossier
+python -m matazero analyze photo.jpg -a -f html -o dossier.html
 
-```bash
-# 1. Create and validate an authorization scope (Short flags: -c, -p, -l, -a, -o)
-python -m matazero scope create -c "CASE-001" -p "Forensic Ingest" -l "Warrant" -a "Lead" -o scope.json
+# 3. Output structured JSON for automation
+python -m matazero analyze photo.jpg -a -f json -o output.json
+
+# 4. Automatically carve hidden trailing ZIP/RAR/EXE payloads
+python -m matazero analyze suspicious.jpg -a -c --carve-dir ./carved_files
+
+# 5. Create an authorization scope for forensic custody
+python -m matazero scope create -c "CASE-2026-01" -p "Forensic Ingest" -l "Warrant" -a "Lead Investigator" -o scope.json
 python -m matazero scope validate scope.json
 
-# 2. Run full 7-tier forensic analysis with active scope (-s)
+# 6. Run scoped analysis under legal custody
 python -m matazero analyze evidence.jpg -s scope.json
 
-# 3. Generate an interactive standalone offline HTML Dossier (-f html -o report.html)
-python -m matazero analyze evidence.jpg -a -f html -o report.html
+# 7. Learn a new camera hardware fingerprint from a reference shot
+python -m matazero corpus learn ref_shot.jpg -i canon_r5 -m "Canon EOS R5" -e "DIGIC X Hardware ISP"
 
-# 4. Analyze and automatically carve hidden trailing payloads / ZIP archives (-c / --carve)
-python -m matazero analyze suspicious.jpg -a -c --carve-dir ./carved_payloads
-
-# 5. Inspect or expand the reference camera / encoder corpus
+# 8. List all registered device and platform profiles
 python -m matazero corpus list
-python -m matazero corpus learn reference_shot.jpg -i my_camera_id -m "Sony Alpha A7 IV" -e "Sony BIONZ XR"
 
-# 6. Probe container structure with exact byte offsets
-python -m matazero probe evidence.jpg
+# 9. Probe container segments with exact byte offsets
+python -m matazero probe photo.jpg
 
-# 7. Verify the cryptographic hash chain of the audit trail
+# 10. Verify audit log tamper-resistance
 python -m matazero audit verify ./audit.jsonl
 
-# 8. Losslessly strip metadata while preserving raw image pixels (-o out, -c commit)
-python -m matazero clean personal.jpg -o cleaned.jpg -c
+# 11. Losslessly strip metadata while preserving raw pixel streams
+python -m matazero clean photo.jpg -o cleaned.jpg -c
 ```
-
-## 6. Short Flags & Options Reference
-
-| Subcommand | Short Flag | Long Flag | Description |
-| :--- | :--- | :--- | :--- |
-| `analyze` | `-s` | `--scope` | Path to authorization scope JSON |
-| `analyze` | `-a` | `--self-audit` | Operate in self-audit mode without an external scope |
-| `analyze` | `-f` | `--format` | Output format (`report`, `json`, `ndjson`, `table`, `html`) |
-| `analyze` | `-o` | `--out` | Write output to destination file |
-| `analyze` | `-t` | `--tiers` | Comma-separated list of tiers to run (e.g. `1,2,3,4,7`) |
-| `analyze` | `-e` | `--ela` | Enable Error Level Analysis (Tier 6) |
-| `analyze` | `-c` | `--carve` | Automatically carve trailing payloads / archives |
-| `analyze` | `-n` | `--allow-network` | Enable disclosed network lookups (GR-4.1) |
-| `corpus learn` | `-i` | `--id` | Unique identifier for new device profile |
-| `corpus learn` | `-m` | `--model` | Camera or device model description |
-| `corpus learn` | `-e` | `--encoder` | Software or hardware encoder pipeline name |
-| `scope create` | `-c` | `--case` | Case ID identifier |
-| `scope create` | `-p` | `--purpose` | Forensic investigation purpose |
-| `scope create` | `-l` | `--legal-basis` | Legal basis or warrant authority |
-| `scope create` | `-a` | `--authorising-party` | Name/role of authorising party |
-| `scope create` | `-d` | `--days` | Scope validity duration in days (default: 30) |
-| `scope create` | `-o` | `--out` | Output path for scope JSON file |
-| `scope create` | `-k` | `--secret` | HMAC secret key for cryptographic signing |
-| `clean` | `-o` | `--out` | Output path for cleaned file |
-| `clean` | `-c` | `--commit` | Required flag to execute file modification |
 
 ---
 
-## 6. Exit Codes
+## Short Flags Reference
+
+| Subcommand | Short | Long Flag | Description |
+| :--- | :--- | :--- | :--- |
+| `analyze` | `-s` | `--scope` | Path to authorization scope JSON |
+| `analyze` | `-a` | `--self-audit` | Run in self-audit mode without an external scope |
+| `analyze` | `-f` | `--format` | Output format: `report`, `json`, `ndjson`, `table`, `html` |
+| `analyze` | `-o` | `--out` | Write output to specified file |
+| `analyze` | `-t` | `--tiers` | Comma-separated list of tiers to run (e.g. `1,2,3,4,7`) |
+| `analyze` | `-e` | `--ela` | Enable Error Level Analysis (Tier 6) |
+| `analyze` | `-c` | `--carve` | Automatically extract trailing payloads / archives |
+| `analyze` | `-n` | `--allow-network` | Enable disclosed network lookups |
+| `corpus learn` | `-i` | `--id` | Unique profile ID |
+| `corpus learn` | `-m` | `--model` | Camera or device model description |
+| `corpus learn` | `-e` | `--encoder` | Software or hardware encoder name |
+| `scope create` | `-c` | `--case` | Case identifier |
+| `scope create` | `-p` | `--purpose` | Investigation purpose |
+| `scope create` | `-l` | `--legal-basis` | Lawful authority / warrant |
+| `scope create` | `-a` | `--authorising-party` | Authorising party name/role |
+| `scope create` | `-d` | `--days` | Scope validity window in days (default: 30) |
+| `scope create` | `-o` | `--out` | Output path for scope JSON file |
+| `scope create` | `-k` | `--secret` | HMAC secret key for signing |
+| `scope validate`| `-k` | `--secret` | HMAC secret key for validation |
+| `clean` | `-o` | `--out` | Destination path for cleaned file |
+| `clean` | `-c` | `--commit` | Execute modification (dry-run without it) |
+
+---
+
+## Exit Codes
 
 | Code | Status | Meaning |
 |:---:|---|---|
-| `0` | **Success** | Complete analysis success |
-| `1` | **Runtime Error** | Unhandled execution error |
-| `2` | **Usage Error** | Invalid CLI arguments or flags |
-| `3` | **Unsupported Format** | Unsupported container magic bytes |
+| `0` | **Success** | Complete analysis finished successfully |
+| `1` | **Runtime Error** | Unhandled execution exception |
+| `2` | **Usage Error** | Invalid CLI options or argument syntax |
+| `3` | **Unsupported Format** | File magic bytes not recognized |
 | `4` | **Partial Success** | Batch completed with non-fatal diagnostics |
-| `5` | **Budget Exceeded** | Resource/unit/depth budget exceeded |
+| `5` | **Budget Exceeded** | Resource/unit/depth safety limit exceeded |
 | `6` | **Authorization Failure** | Missing, invalid, or expired authorization scope |
 | `7` | **Custody Failure** | Evidence hash mismatch or broken audit chain |
 
 ---
 
-## 7. Refused Capabilities & Governance Boundaries
+## Ethical Boundaries
 
-Per **GR-3.1 through GR-3.8** and `docs/ETHICS.md`, the following mass surveillance capabilities are **permanently refused**:
+`matazero` includes code-level safeguards against surveillance abuse:
 
-* ❌ **No Face Recognition or Biometric Identification** (GDPR Art. 9).
-* ❌ **No Bulk Web / Platform Scraping**.
-* ❌ **No Automated Identity Correlation Across Platforms**.
-* ❌ **No Real-Time Location Tracking**.
-* ❌ **No External Hash Database Lookups (PhotoDNA, etc.)**.
-* 🛡️ **Authenticity & Integrity Verdicts**: Ground-truth structural verdicts (`AUTHENTIC_CAMERA_CAPTURE`, `TAMPERED_TRAILING_PAYLOAD`, `AI_SYNTHETIC_GENERATION`, `UNVERIFIED_METADATA_STRIPPED`) are computed transparently from hardware quantization profiles, container markers, C2PA claims, and tamper indicators with mandatory confidence scores and caveats.
+* ❌ **No Facial Recognition or Biometrics**
+* ❌ **No Bulk Web Scraping or Social Media Crawling**
+* ❌ **No Cross-Platform Identity Tracking**
+* ❌ **No Real-Time Geolocation Tracking**
+* ❌ **No External Hash Database Lookups**
+* 🛡️ **Transparent Authenticity Analysis**: Authenticity assessments (`AUTHENTIC_CAMERA_CAPTURE`, `TAMPERED_TRAILING_PAYLOAD`, `AI_SYNTHETIC_GENERATION`, `UNVERIFIED_METADATA_STRIPPED`) are computed from verifiable structural indicators with mandatory confidence scores and caveats.
 
 ---
 
-## 8. Documentation
+## Documentation
 
 * [PRD (Product Requirements Document)](plan/PRD.md)
 * [SRD (Software Requirements Document)](plan/SRD.md)
 * [SRS (Software Requirements Specification)](plan/SRS.md)
-* [Architecture & ADRs](plan/ARCHITECTURE.md)
+* [Architecture & Decision Records](plan/ARCHITECTURE.md)
 * [Security Policy & Threat Model](docs/SECURITY.md)
-* [Ethics & Governance Model](docs/ETHICS.md)
+* [Ethics & Governance](docs/ETHICS.md)
 
 ---
 
-## 9. License
+## License
 
-Licensed under the **Apache 2.0 License**. See [LICENSE](LICENSE) for details.
+Distributed under the **Apache 2.0 License**. See [LICENSE](LICENSE) for details.
