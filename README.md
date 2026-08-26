@@ -74,28 +74,104 @@ Even when social media platforms strip EXIF metadata, `matazero` analyzes the un
 
 ## Installation
 
+### Prerequisites
+
+* Python **3.10** or higher
+* `pip` and `git`
+
+---
+
+### Option 1: Install from Source (Recommended)
+
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/nextboxis/matazero.git
 cd matazero
 
-# Install dependencies
+# 2. (Optional but recommended) Create and activate a virtual environment
+python -m venv .venv
+
+# On Linux/macOS:
+source .venv/bin/activate
+
+# On Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+
+# On Windows (Command Prompt):
+.venv\Scripts\activate.bat
+
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# Or install in editable mode
+# For development / testing dependencies (includes pytest):
+pip install -r requirements-dev.txt
+
+# 4. Install the CLI package in editable mode
 pip install -e .
 ```
 
-### Running the Tool
+---
 
-You can invoke `matazero` via any of the following:
+### Option 2: Direct Install via Git
+
+Install the latest release directly into your active Python environment:
 
 ```bash
-# Recommended (works in any terminal)
-python -m matazero --help
+pip install git+https://github.com/nextboxis/matazero.git
+```
 
-# Global CLI command (if Python Scripts is in your PATH)
+---
+
+### Option 3: Zero-Install / Standalone Execution
+
+Run `matazero` directly without global installation:
+
+```bash
+# Install core dependencies
+pip install -r requirements.txt
+
+# Run directly via Python module or wrapper scripts
+python -m matazero --help
+python mata.py --help
+python matazero.py --help
+```
+
+---
+
+## CLI Access & Global Aliases
+
+Once installed via `pip install -e .` or `pip install .`, the CLI registers three interchangeable global commands:
+
+| Command | Description |
+|:---|:---|
+| `matazero` | Primary CLI entry point |
+| `mata` | Convenient short alias |
+| `imgint` | Engine alias |
+| `python -m matazero` | Direct module execution (always works even if PATH is not configured) |
+
+### Verify Installation
+
+```bash
+matazero --version
 matazero --help
+```
+
+---
+
+## Shell Autocompletion
+
+`matazero` supports tab autocompletion for Bash, Zsh, and Fish shells:
+
+```bash
+# Bash
+matazero completion bash > ~/.local/share/bash-completion/completions/matazero
+
+# Zsh
+matazero completion zsh > ~/.zfunc/_matazero
+# (Ensure fpath=(~/.zfunc $fpath) and autoload -Uz compinit && compinit are in your ~/.zshrc)
+
+# Fish
+matazero completion fish > ~/.config/fish/completions/matazero.fish
 ```
 
 ---
