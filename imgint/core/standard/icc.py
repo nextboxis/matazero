@@ -23,7 +23,9 @@ class IccParser(BlockParser):
 
         data = block.raw_bytes
         # In JPEG APP2, ICC profiles have a 2-byte chunk sequence prefix e.g. [chunk_no, total_chunks]
-        if len(data) >= 2 and data[0] == 1 and data[1] >= 1:
+        if block.source_unit == "APP2_ICC" and len(data) >= 2:
+            data = data[2:]
+        elif len(data) >= 2 and data[0] == 1 and data[1] >= 1:
             data = data[2:]
 
         size = len(data)

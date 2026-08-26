@@ -8,6 +8,7 @@ from imgint.core.container.tiff import TiffContainerReader
 from imgint.core.container.riff import RiffContainerReader
 from imgint.core.container.bmff import BmffContainerReader
 from imgint.core.container.gif import GifContainerReader
+from imgint.core.container.bmp import BmpContainerReader
 
 
 def create_default_container_registry() -> ContainerRegistry:
@@ -18,6 +19,7 @@ def create_default_container_registry() -> ContainerRegistry:
     reg.register(RiffContainerReader())
     reg.register(BmffContainerReader())
     reg.register(GifContainerReader())
+    reg.register(BmpContainerReader())
     return reg
 
 
@@ -30,5 +32,6 @@ __all__ = [
     "RiffContainerReader",
     "BmffContainerReader",
     "GifContainerReader",
+    "BmpContainerReader",
     "create_default_container_registry",
 ]

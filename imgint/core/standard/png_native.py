@@ -70,30 +70,34 @@ class PngNativeParser(BlockParser):
                         diagnostics.append(Diagnostic(level="warning", message=f"zTXt decompression failed: {e}", source="png_native_parser", offset=block.offset))
 
         elif "iTXt" in source_unit:
-            # Keyword\0CompFlag\0CompMethod\0LangTag\0TransKey\0Text
-            parts = data.split(b"\x00", 4)
-            if len(parts) >= 5:
-                keyword = parts[0].decode("utf-8", errors="replace").strip()
-                text_bytes = parts[4]
-                comp_flag = data[len(parts[0]) + 1] if len(data) > len(parts[0]) + 1 else 0
-                if comp_flag == 1:
-                    try:
-                        text_bytes = zlib.decompress(text_bytes)
-                    except Exception:
-                        pass
-                val = text_bytes.decode("utf-8", errors="replace").strip()
-                fields.append(Field(standard="PNG", name=f"png:{keyword}", value=val, raw_value=val, value_type="STRING"))
-                findings.append(
-                    Finding(
-                        name=f"png_itxt_{keyword.lower()}",
-                        value=val,
-                        tier=1,
-                        extractor="png_native_parser",
-                        confidence=Confidence.OBSERVED,
-                        caveat=None,
-                        provenance=Provenance(source_layer="standard", extractor="png_native_parser", offset=block.offset, length=block.length, standard="PNG"),
+            # Structure: Keyword\0CompFlag(1B)CompMethod(1B)LangTag\0TransKey\0Text
+            if b"\x00" in data:
+                null_idx = data.find(b"\x00")
+                keyword = data[:null_idx].decode("utf-8", errors="replace").strip()
+                if len(data) >= null_idx + 3:
+                    comp_flag = data[null_idx + 1]
+                    comp_method = data[null_idx + 2]
+                    rest = data[null_idx + 3:]
+                    rest_parts = rest.split(b"\x00", 2)
+                    text_bytes = rest_parts[2] if len(rest_parts) == 3 else (rest_parts[-1] if rest_parts else b"")
+                    if comp_flag == 1 and text_bytes:
+                        try:
+                            text_bytes = zlib.decompress(text_bytes)
+                        except Exception as e:
+                            diagnostics.append(Diagnostic(level="warning", message=f"iTXt decompression failed: {e}", source="png_native_parser", offset=block.offset))
+                    val = text_bytes.decode("utf-8", errors="replace").strip()
+                    fields.append(Field(standard="PNG", name=f"png:{keyword}", value=val, raw_value=val, value_type="STRING"))
+                    findings.append(
+                        Finding(
+                            name=f"png_itxt_{keyword.lower()}",
+                            value=val,
+                            tier=1,
+                            extractor="png_native_parser",
+                            confidence=Confidence.OBSERVED,
+                            caveat=None,
+                            provenance=Provenance(source_layer="standard", extractor="png_native_parser", offset=block.offset, length=block.length, standard="PNG"),
+                        )
                     )
-                )
 
         elif "tIME" in source_unit and len(data) >= 7:
             year, month, day, hour, minute, second = struct.unpack(">HBBBBB", data[:7])

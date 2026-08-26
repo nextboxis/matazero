@@ -84,8 +84,13 @@ class EvidenceStore:
                 pass
 
         # Create fresh working copy
+        if dest_working.exists():
+            try:
+                dest_working.chmod(stat.S_IREAD | stat.S_IWRITE | stat.S_IRGRP | stat.S_IROTH)
+            except Exception:
+                pass
         shutil.copy2(src, dest_working)
-        # Ensure working copy is readable
+        # Ensure working copy is readable and writable
         try:
             dest_working.chmod(stat.S_IREAD | stat.S_IWRITE | stat.S_IRGRP | stat.S_IROTH)
         except Exception:

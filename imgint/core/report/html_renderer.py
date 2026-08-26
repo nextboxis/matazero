@@ -3,6 +3,7 @@
 from __future__ import annotations
 import json
 import html
+import math
 from typing import List, Dict, Any
 from imgint.core.model.record import AnalysisRecord
 from imgint.core.model.finding import Finding
@@ -25,15 +26,33 @@ class HtmlReportRenderer:
                 tiers[f.tier].append(f)
 
         # Extract special signals for visual widgets
-        solar_finding = next((f for f in record.findings if f.name == "solar_chronolocation_angles"), None)
-        solar_azimuth = solar_finding.value.get("solar_azimuth_deg", 180.0) if solar_finding and isinstance(solar_finding.value, dict) else 180.0
-        solar_elevation = solar_finding.value.get("solar_elevation_deg", 45.0) if solar_finding and isinstance(solar_finding.value, dict) else 45.0
-        has_solar = solar_finding is not None
+        solar_finding = next((f for f in record.findings if f.name in ("solar_position_expected", "solar_chronolocation_angles")), None)
+        if solar_finding and isinstance(solar_finding.value, dict):
+            solar_azimuth = float(solar_finding.value.get("solar_azimuth_degrees") or solar_finding.value.get("solar_azimuth_deg", 180.0))
+            solar_elevation = float(solar_finding.value.get("solar_elevation_degrees") or solar_finding.value.get("solar_elevation_deg", 45.0))
+            has_solar = True
+        else:
+            solar_azimuth = 180.0
+            solar_elevation = 45.0
+            has_solar = False
 
-        gps_finding = next((f for f in record.findings if f.name == "gps_location_fix"), None)
+        angle_rad = math.radians(solar_azimuth - 90)
+        sun_x2 = round(100 + 70 * math.cos(angle_rad), 2)
+        sun_y2 = round(100 + 70 * math.sin(angle_rad), 2)
+        sun_dot_x = round(100 + 65 * math.cos(angle_rad), 2)
+        sun_dot_y = round(100 + 65 * math.sin(angle_rad), 2)
+
+        gps_finding = next((f for f in record.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
         lat = gps_finding.value.get("latitude") if gps_finding and isinstance(gps_finding.value, dict) else None
         lon = gps_finding.value.get("longitude") if gps_finding and isinstance(gps_finding.value, dict) else None
-        place = gps_finding.value.get("nearest_place") if gps_finding and isinstance(gps_finding.value, dict) else None
+        
+        geo_finding = next((f for f in record.findings if f.name == "offline_reverse_geocode"), None)
+        if geo_finding and isinstance(geo_finding.value, dict):
+            place = f"{geo_finding.value.get('closest_city', '')}, {geo_finding.value.get('country', '')}".strip(", ")
+        elif gps_finding and isinstance(gps_finding.value, dict):
+            place = gps_finding.value.get("nearest_place")
+        else:
+            place = None
         has_gps = lat is not None and lon is not None
 
         dim_finding = next((f for f in record.findings if f.name == "image_dimensions"), None)
@@ -328,8 +347,8 @@ class HtmlReportRenderer:
             <text x="100" y="196" fill="#64748B" font-size="10" text-anchor="middle">S (180°)</text>
             <text x="12" y="104" fill="#64748B" font-size="10" text-anchor="middle">W (270°)</text>
             <!-- Sun direction line -->
-            <line x1="100" y1="100" x2="{100 + 70 * ((solar_azimuth - 90) * 3.14159 / 180)}" y2="{100 + 70 * ((solar_azimuth - 90) * 3.14159 / 180)}" stroke="#F59E0B" stroke-width="3" stroke-linecap="round"/>
-            <circle cx="{100 + 65 * ((solar_azimuth - 90) * 3.14159 / 180)}" cy="{100 + 65 * ((solar_azimuth - 90) * 3.14159 / 180)}" r="8" fill="#F59E0B"/>
+            <line x1="100" y1="100" x2="{sun_x2}" y2="{sun_y2}" stroke="#F59E0B" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="{sun_dot_x}" cy="{sun_dot_y}" r="8" fill="#F59E0B"/>
           </svg>
           <div class="mt-2 text-dim text-center">
             Azimuth: <strong>{solar_azimuth:.1f}°</strong> | Elevation: <strong>{solar_elevation:.1f}°</strong>

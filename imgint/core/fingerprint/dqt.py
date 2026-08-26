@@ -72,7 +72,7 @@ class DqtExtractor:
                     for i in range(0, 128, 2)
                 ]
 
-            thash = hashlib.sha256(bytes(values)).hexdigest()[:16]
+            thash = hashlib.sha256(table_bytes).hexdigest()[:16]
             table_type = "Luminance" if table_id == 0 else ("Chrominance" if table_id == 1 else f"Table_{table_id}")
             est_quality = DqtExtractor.estimate_quality(values, table_id)
 

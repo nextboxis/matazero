@@ -78,17 +78,31 @@ class ReportRenderer:
                 lines.append(f"     LSB Bit Density:  {density}")
                 lines.append(f"     Anomaly Status:   {anom_text}")
                 return lines
-            elif name == "gps_location_fix":
+            elif name in ("gps_coordinates_claimed", "gps_location_fix"):
                 lat = val.get("latitude")
                 lon = val.get("longitude")
-                alt = val.get("altitude_m")
-                place = val.get("nearest_place")
-                cc = val.get("country_code")
-                lines.append(f"     Coordinates:      {lat}° N, {lon}° E")
+                lat_ref = val.get("latitude_ref", "")
+                lon_ref = val.get("longitude_ref", "")
+                alt = val.get("altitude_m") or val.get("altitude_meters")
+                place = val.get("nearest_place") or val.get("closest_city")
+                cc = val.get("country_code") or val.get("country")
+                lines.append(f"     Coordinates:      {lat}° {lat_ref}, {lon}° {lon_ref}".strip())
                 if place:
-                    lines.append(f"     Location (Est):   {place}, {cc}")
+                    lines.append(f"     Location (Est):   {place}" + (f", {cc}" if cc else ""))
                 if alt is not None:
                     lines.append(f"     Altitude:         {alt} m")
+                return lines
+            elif name == "offline_reverse_geocode":
+                city = val.get("closest_city", "Unknown")
+                admin = val.get("admin_region", "")
+                country = val.get("country", "")
+                tz = val.get("timezone", "")
+                dist = val.get("approx_distance_km")
+                lines.append(f"     Nearest Place:    {city}, {admin}, {country}")
+                if tz:
+                    lines.append(f"     Timezone:         {tz}")
+                if dist is not None:
+                    lines.append(f"     Distance:         ~{dist} km")
                 return lines
             elif name == "authenticity_verdict":
                 auth = val.get("is_authentic")
@@ -104,12 +118,15 @@ class ReportRenderer:
                 if reasons:
                     lines.append(f"     Key Evidence:     {'; '.join(reasons)}")
                 return lines
-            elif name == "solar_chronolocation_angles":
-                az = val.get("solar_azimuth_deg")
-                el = val.get("solar_elevation_deg")
+            elif name in ("solar_position_expected", "solar_chronolocation_angles"):
+                az = val.get("solar_azimuth_degrees") or val.get("solar_azimuth_deg")
+                el = val.get("solar_elevation_degrees") or val.get("solar_elevation_deg")
+                visible = val.get("sun_visible")
                 sf = val.get("shadow_length_factor")
                 lines.append(f"     Solar Azimuth:    {az}°")
                 lines.append(f"     Solar Elevation:  {el}°")
+                if visible is not None:
+                    lines.append(f"     Sun Visible:      {'Yes (Daylight)' if visible else 'No (Night / Below Horizon)'}")
                 if sf is not None:
                     lines.append(f"     Shadow Factor:    {sf}")
                 return lines
@@ -210,7 +227,7 @@ class ReportRenderer:
             if t == 1 and record.fields:
                 lines.append(f" • Extracted Metadata Fields ({len(record.fields)} total):")
                 for fld in record.fields[:15]:
-                    lines.append(f"     {fld.name:24} : {fld.value} ({fld.block_kind})")
+                    lines.append(f"     {fld.name:24} : {fld.value} ({fld.standard})")
                 if len(record.fields) > 15:
                     lines.append(f"     ... and {len(record.fields) - 15} additional fields preserved in structured output.")
                 lines.append("")

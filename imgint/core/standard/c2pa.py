@@ -29,11 +29,12 @@ class C2paParser(BlockParser):
         # Extract claim generator if present
         if b"claim_generator" in data:
             idx = data.find(b"claim_generator")
-            claim_bytes = data[idx : idx + 120]
+            claim_bytes = data[idx : idx + 200]
             text = claim_bytes.decode("utf-8", errors="ignore")
-            parts = text.split('"')
-            if len(parts) >= 2:
-                claim_generator = parts[1]
+            # Match "claim_generator": "Adobe Photoshop 2024" or claim_generator="Tool"
+            m = re.search(r'claim_generator["\s:]+([^"\r\n,}]+)', text)
+            if m:
+                claim_generator = m.group(1).strip().strip('"')
             else:
                 claim_generator = "C2PA_Manifest"
 

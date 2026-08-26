@@ -62,6 +62,12 @@ class BoundedReader:
         if self.current_depth > 0:
             self.current_depth -= 1
 
+    def can_read(self, length: int, offset: Optional[int] = None) -> bool:
+        if length < 0:
+            return False
+        off = offset if offset is not None else 0
+        return off + length <= self._size
+
     def read_bytes(self, offset: int, length: int) -> bytes:
         if offset < 0 or length < 0:
             raise SourceBoundsError(f"Negative offset ({offset}) or length ({length})")

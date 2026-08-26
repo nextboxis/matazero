@@ -73,10 +73,11 @@ class MetadataCleaner:
                 break
 
             if marker == 0xDA:  # SOS (Start of Scan) - rest is entropy data until EOI
-                sos_len = struct.unpack(">H", data[offset + 2 : offset + 4])[0]
-                total_seg = 2 + sos_len
-                # Append SOS header and the entire remaining image stream up to EOI
-                out.extend(data[offset:])
+                eoi_idx = data.find(b"\xFF\xD9", offset)
+                if eoi_idx != -1:
+                    out.extend(data[offset : eoi_idx + 2])
+                else:
+                    out.extend(data[offset:])
                 break
 
             if offset + 4 > size:

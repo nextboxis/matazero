@@ -75,8 +75,15 @@ class TiffContainerReader(ContainerReader):
         # Walk IFD chain
         ifd_offset = first_ifd_offset
         ifd_index = 0
+        visited_ifds = set()
 
         while ifd_offset > 0 and ifd_offset + 2 <= size:
+            if ifd_offset in visited_ifds:
+                diagnostics.append(
+                    Diagnostic(level="warning", message=f"Cyclic IFD pointer detected at offset {ifd_offset}", source="tiff_reader", offset=ifd_offset)
+                )
+                break
+            visited_ifds.add(ifd_offset)
             try:
                 reader.check_unit_budget()
             except SourceBoundsError as e:

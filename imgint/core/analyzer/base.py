@@ -26,8 +26,10 @@ class AnalysisContext:
     enable_ela: bool = False
 
     def get_field_value(self, name: str) -> Optional[Any]:
+        n_low = name.lower()
         for f in self.fields:
-            if f.name.lower() == name.lower() or f.name.endswith(f":{name}"):
+            f_low = f.name.lower()
+            if f_low == n_low or f_low.endswith(f":{n_low}"):
                 return f.value
         return None
 

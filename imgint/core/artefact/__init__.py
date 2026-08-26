@@ -5,6 +5,7 @@ from imgint.core.artefact.mpf import MpfExtractor, MpfImage
 from imgint.core.artefact.trailing import TrailingDataExtractor, TrailingDataInfo
 from imgint.core.artefact.preview import PreviewExtractor
 from imgint.core.artefact.anomalies import ContainerAnomalyDetector
+from imgint.core.artefact.carver import PayloadCarver, CarvedPayload
 
 __all__ = [
     "ThumbnailExtractor",
@@ -15,4 +16,6 @@ __all__ = [
     "TrailingDataInfo",
     "PreviewExtractor",
     "ContainerAnomalyDetector",
+    "PayloadCarver",
+    "CarvedPayload",
 ]

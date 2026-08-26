@@ -54,9 +54,12 @@ class BmffContainerReader(ContainerReader):
             if box_size < header_len or offset + box_size > size:
                 box_size = size - offset
 
+            if box_size < header_len:
+                break
+
             data_offset = offset + header_len
-            data_len = box_size - header_len
-            payload_bytes = reader.read_bytes(data_offset, min(data_len, 4096))
+            data_len = max(0, box_size - header_len)
+            payload_bytes = reader.read_bytes(data_offset, min(data_len, 4096)) if data_len > 0 else b""
 
             units.append(
                 StructuralUnit(

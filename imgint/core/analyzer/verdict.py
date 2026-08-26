@@ -63,8 +63,8 @@ class AuthenticityEvaluator:
         # 3. Check LSB Entropy Steganography Screening (Tier 7)
         lsb_f = next((f for f in record.findings if f.name == "lsb_entropy_screening"), None)
         if lsb_f and isinstance(lsb_f.value, dict):
-            status = lsb_f.value.get("Anomaly Status", "")
-            if "High Density" in status:
+            is_anomaly = lsb_f.value.get("lsb_anomaly", False) or "High Density" in str(lsb_f.value.get("Anomaly Status", ""))
+            if is_anomaly:
                 flags["steganography_suspected"] = True
                 reasons.append("High LSB entropy density detected (potential steganographic carrier or dense texture).")
                 score -= 0.15
@@ -72,11 +72,11 @@ class AuthenticityEvaluator:
         # 4. Check Encoder Attribution (Tier 2)
         attr_f = next((f for f in record.findings if f.name == "encoder_attribution"), None)
         if attr_f and isinstance(attr_f.value, dict):
-            model = attr_f.value.get("Device Model", "")
-            encoder = attr_f.value.get("Encoder Software", "")
-            sim = attr_f.value.get("Similarity Score", 0.0)
+            model = attr_f.value.get("device_model") or attr_f.value.get("Device Model", "")
+            encoder = attr_f.value.get("encoder_software") or attr_f.value.get("Encoder Software", "")
+            sim = attr_f.value.get("similarity_score") or attr_f.value.get("Similarity Score", 0.0)
 
-            if "Midjourney" in model or "Stable Diffusion" in model:
+            if "Midjourney" in model or "Stable Diffusion" in model or "DALL-E" in model:
                 flags["ai_generation_detected"] = True
                 reasons.append(f"Quantization & structure match Generative AI pipeline ({model}).")
                 score = 0.1
@@ -105,7 +105,7 @@ class AuthenticityEvaluator:
             score += 0.2
 
         # 6. Check Metadata Presence & Coherence (Tier 1 & 5)
-        gps_f = next((f for f in record.findings if f.name == "gps_location_fix"), None)
+        gps_f = next((f for f in record.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
         if gps_f:
             reasons.append("GPS geolocation fix embedded in container metadata.")
             score += 0.1

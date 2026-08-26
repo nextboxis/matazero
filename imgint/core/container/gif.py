@@ -71,7 +71,7 @@ class GifContainerReader(ContainerReader):
 
         frame_count = 0
         # Parse blocks until Trailer (0x3B)
-        while offset < reader.size and reader.can_read(1):
+        while offset < reader.size and reader.can_read(1, offset):
             intro = reader.read_bytes(offset, 1)
             if not intro:
                 break
@@ -88,6 +88,19 @@ class GifContainerReader(ContainerReader):
                     )
                 )
                 offset += 1
+                if offset < reader.size:
+                    trailing_len = reader.size - offset
+                    units.append(
+                        StructuralUnit(
+                            name="TRAILING_DATA",
+                            offset=offset,
+                            length=trailing_len,
+                            data_offset=offset,
+                            data_length=trailing_len,
+                            description=f"Appended trailing bytes ({trailing_len} bytes) after GIF Trailer",
+                            payload=reader.read_bytes(offset, min(trailing_len, 4096)),
+                        )
+                    )
                 break
 
             elif intro == b"\x21":  # Extension Block

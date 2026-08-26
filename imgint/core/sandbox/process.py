@@ -32,11 +32,13 @@ class SandboxRunner:
         }
         input_json = json.dumps(payload)
 
-        cmd = [
-            sys.executable,
-            "-m",
-            "imgint.core.sandbox.worker",
-        ]
+        # Ensure child process can always locate imgint package
+        repo_root = str(Path(__file__).parent.parent.parent.parent.resolve())
+        env = dict(sys.modules.get("os", {}).environ if hasattr(sys, "modules") else {})
+        import os
+        env = os.environ.copy()
+        existing_pythonpath = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{repo_root}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else repo_root
 
         try:
             proc = subprocess.Popen(
@@ -45,6 +47,8 @@ class SandboxRunner:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                env=env,
+                cwd=repo_root,
             )
             stdout_str, stderr_str = proc.communicate(input=input_json, timeout=timeout)
             if proc.returncode != 0:
