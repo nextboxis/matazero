@@ -66,6 +66,9 @@ class Field:
     value_type: str
     tag_id: Optional[str] = None
     description: Optional[str] = None
+    offset: Optional[int] = None        # Tag entry / header offset in file
+    value_offset: Optional[int] = None  # Offset where value bytes actually reside in file
+    length: Optional[int] = None        # Byte length of value data
 
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {
@@ -78,7 +81,14 @@ class Field:
             d["tag_id"] = self.tag_id
         if self.description:
             d["description"] = self.description
+        if self.offset is not None:
+            d["offset"] = self.offset
+        if self.value_offset is not None:
+            d["value_offset"] = self.value_offset
+        if self.length is not None:
+            d["length"] = self.length
         return d
+
 
 
 @dataclass

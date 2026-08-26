@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from imgint.core.analyzer.base import Analyzer, AnalysisContext
 from imgint.core.model.finding import Finding, Confidence, Provenance
 from imgint.core.model.record import Diagnostic
+from imgint.core.geo.locator import GeoLocator
 
 
 class GeoTimeAnalyzer(Analyzer):
@@ -54,6 +55,19 @@ class GeoTimeAnalyzer(Analyzer):
                 diagnostics.append(Diagnostic(level="warning", message=f"GPS coordinate conversion failed: {e}", source="geotime_analyzer"))
 
         if lat_dec is not None and lon_dec is not None:
+            lat_field = ctx.get_field("GPSLatitude")
+            lon_field = ctx.get_field("GPSLongitude")
+            y_loc = {
+                "tag_offset": lat_field.offset if lat_field else None,
+                "value_offset": lat_field.value_offset if lat_field else None,
+                "length": lat_field.length if lat_field else None,
+            }
+            x_loc = {
+                "tag_offset": lon_field.offset if lon_field else None,
+                "value_offset": lon_field.value_offset if lon_field else None,
+                "length": lon_field.length if lon_field else None,
+            }
+
             findings.append(
                 Finding(
                     name="gps_coordinates_claimed",
@@ -62,6 +76,10 @@ class GeoTimeAnalyzer(Analyzer):
                         "longitude": round(lon_dec, 6),
                         "latitude_ref": lat_ref,
                         "longitude_ref": lon_ref,
+                        "y": round(lat_dec, 6),
+                        "x": round(lon_dec, 6),
+                        "y_value_location": y_loc,
+                        "x_value_location": x_loc,
                     },
                     tier=5,
                     extractor="geotime_analyzer",
@@ -70,12 +88,18 @@ class GeoTimeAnalyzer(Analyzer):
                         "GPS coordinates reflect data recorded in image metadata by the device. "
                         "They can be manually edited, injected, or altered by third-party tools (FR-6.8)."
                     ),
-                    provenance=Provenance(source_layer="analyzer", extractor="geotime_analyzer", standard="EXIF"),
+                    provenance=Provenance(
+                        source_layer="analyzer",
+                        extractor="geotime_analyzer",
+                        offset=lat_field.value_offset if lat_field else None,
+                        length=(lat_field.length if lat_field else 0) + (lon_field.length if lon_field else 0),
+                        standard="EXIF",
+                    ),
                 )
             )
 
             # FR-6.3 & GR-4.4: Offline reverse geocoding
-            offline_place = self._offline_reverse_geocode(lat_dec, lon_dec)
+            offline_place = GeoLocator.reverse_geocode_offline(lat_dec, lon_dec)
             if offline_place:
                 findings.append(
                     Finding(
@@ -109,10 +133,10 @@ class GeoTimeAnalyzer(Analyzer):
                 )
             )
 
-        # FR-6.4: NOAA Solar position calculation for chronolocation
+        # FR-6.4: Astronomical Solar position calculation for chronolocation
         dt_capture = self._parse_datetime(date_orig)
         if lat_dec is not None and lon_dec is not None and dt_capture is not None:
-            solar_pos = self._compute_noaa_solar_position(lat_dec, lon_dec, dt_capture)
+            solar_pos = GeoLocator.compute_solar_chronolocation(lat_dec, lon_dec, dt_capture)
             if solar_pos:
                 findings.append(
                     Finding(
@@ -122,7 +146,7 @@ class GeoTimeAnalyzer(Analyzer):
                         extractor="solar_calculator",
                         confidence=Confidence.DERIVED,
                         caveat=(
-                            "Expected solar azimuth and elevation computed using NOAA algorithm from claimed GPS and timestamp. "
+                            "Expected solar azimuth and elevation computed using NOAA/Astral algorithms from claimed GPS and timestamp. "
                             "Provided for analyst comparison against visible shadow geometry."
                         ),
                         provenance=Provenance(source_layer="analyzer", extractor="solar_calculator"),
@@ -228,39 +252,7 @@ class GeoTimeAnalyzer(Analyzer):
         return float(val)
 
     def _offline_reverse_geocode(self, lat: float, lon: float) -> Optional[Dict[str, Any]]:
-        geo_file = Path(__file__).parent.parent / "data" / "geonames_offline.json"
-        if not geo_file.exists():
-            return None
-        try:
-            with open(geo_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                places = data.get("places", [])
-                if not places:
-                    return None
-
-                closest = None
-                min_dist = float("inf")
-                for p in places:
-                    plat = p["lat"]
-                    plon = p["lon"]
-                    # Euclidean distance approximation for nearby points
-                    d = math.hypot(lat - plat, (lon - plon) * math.cos(math.radians(lat)))
-                    if d < min_dist:
-                        min_dist = d
-                        closest = p
-
-                if closest:
-                    dist_km = min_dist * 111.0
-                    return {
-                        "closest_city": closest["name"],
-                        "admin_region": closest["admin1"],
-                        "country": closest["country"],
-                        "timezone": closest.get("timezone"),
-                        "approx_distance_km": round(dist_km, 1),
-                    }
-        except Exception:
-            pass
-        return None
+        return GeoLocator.reverse_geocode_offline(lat, lon)
 
     def _parse_datetime(self, date_str: Optional[str]) -> Optional[datetime]:
         if not date_str or not isinstance(date_str, str):
@@ -281,53 +273,4 @@ class GeoTimeAnalyzer(Analyzer):
         return None
 
     def _compute_noaa_solar_position(self, lat: float, lon: float, dt: datetime) -> Optional[Dict[str, Any]]:
-        """Calculates expected solar elevation and azimuth using NOAA approximation."""
-        try:
-            # Day of year
-            day_of_year = dt.timetuple().tm_yday
-            hour_float = dt.hour + dt.minute / 60.0 + dt.second / 3600.0
-
-            # Fractional year in radians
-            gamma = 2.0 * math.pi / 365.0 * (day_of_year - 1 + (hour_float - 12.0) / 24.0)
-
-            # Equation of time in minutes
-            eqtime = 229.18 * (0.000075 + 0.001868 * math.cos(gamma) - 0.032077 * math.sin(gamma) - 0.014615 * math.cos(2 * gamma) - 0.040849 * math.sin(2 * gamma))
-
-            # Solar declination angle in radians
-            decl = 0.006918 - 0.399912 * math.cos(gamma) + 0.070257 * math.sin(gamma) - 0.006758 * math.cos(2 * gamma) + 0.000907 * math.sin(2 * gamma)
-
-            # True solar time in minutes
-            time_offset = eqtime + 4.0 * lon
-            tst = dt.hour * 60.0 + dt.minute + dt.second / 60.0 + time_offset
-
-            # Solar hour angle in degrees
-            ha = (tst / 4.0) - 180.0
-
-            lat_rad = math.radians(lat)
-            ha_rad = math.radians(ha)
-
-            # Solar zenith angle
-            cos_zenith = math.sin(lat_rad) * math.sin(decl) + math.cos(lat_rad) * math.cos(decl) * math.cos(ha_rad)
-            cos_zenith = max(-1.0, min(1.0, cos_zenith))
-            zenith_rad = math.acos(cos_zenith)
-
-            elevation_deg = 90.0 - math.degrees(zenith_rad)
-
-            # Solar azimuth angle
-            sin_zenith = math.sin(zenith_rad)
-            if sin_zenith != 0:
-                cos_azimuth = (math.sin(lat_rad) * math.cos(zenith_rad) - math.sin(decl)) / (math.cos(lat_rad) * sin_zenith)
-                cos_azimuth = max(-1.0, min(1.0, cos_azimuth))
-                azimuth_deg = 180.0 - math.degrees(math.acos(cos_azimuth))
-                if ha > 0:
-                    azimuth_deg = 360.0 - azimuth_deg
-            else:
-                azimuth_deg = 0.0
-
-            return {
-                "solar_elevation_degrees": round(elevation_deg, 2),
-                "solar_azimuth_degrees": round(azimuth_deg, 2),
-                "sun_visible": bool(elevation_deg > 0),
-            }
-        except Exception:
-            return None
+        return GeoLocator._compute_noaa_solar_position(lat, lon, dt)

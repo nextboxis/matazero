@@ -6,6 +6,7 @@ from imgint.core.artefact.trailing import TrailingDataExtractor, TrailingDataInf
 from imgint.core.artefact.preview import PreviewExtractor
 from imgint.core.artefact.anomalies import ContainerAnomalyDetector
 from imgint.core.artefact.carver import PayloadCarver, CarvedPayload
+from imgint.core.artefact.extractor import ArtefactExtractor, ExtractedItem
 
 __all__ = [
     "ThumbnailExtractor",
@@ -18,4 +19,6 @@ __all__ = [
     "ContainerAnomalyDetector",
     "PayloadCarver",
     "CarvedPayload",
+    "ArtefactExtractor",
+    "ExtractedItem",
 ]

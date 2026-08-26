@@ -183,8 +183,10 @@ matazero <command> [options] [targets...]
 
 Commands:
   scope       Create, validate, or display an authorization scope
-  analyze     Run 7 extraction tiers over evidence files
+  analyze     Run 7 extraction tiers over evidence files (supports -r, --glob, --filter, -j)
+  locate      Forensic geolocation, reverse geocoding, solar chronolocation, and interactive maps
   probe       Dump container segment and chunk structure with byte offsets
+  extract     Extract embedded thumbnails, previews, payloads, metadata streams, or -x -y crops
   corpus      Manage and inspect the reference encoder fingerprint corpus
   audit       Verify or export the tamper-evident audit log
   clean       Losslessly remove metadata in self-audit mode
@@ -197,35 +199,47 @@ Commands:
 # 1. Quick analysis on an image (Self-Audit mode for personal files)
 python -m matazero analyze photo.jpg -a
 
-# 2. Generate an interactive standalone HTML dossier
-python -m matazero analyze photo.jpg -a -f html -o dossier.html
+# 2. Forensic Geolocation: Coordinates, reverse geocoding, solar angles & map links
+python -m matazero locate photo.jpg -a
 
-# 3. Output structured JSON for automation
-python -m matazero analyze photo.jpg -a -f json -o output.json
+# 3. Multi-image spatial relation, geodesic distance, velocity & travel anomaly check
+python -m matazero locate photo1.jpg photo2.jpg -a
 
-# 4. Automatically carve hidden trailing ZIP/RAR/EXE payloads
-python -m matazero analyze suspicious.jpg -a -c --carve-dir ./carved_files
+# 4. Generate an interactive standalone Leaflet / OpenStreetMap HTML dossier map
+python -m matazero locate ./case_photos -a -r -f html -o dossier_map.html
 
-# 5. Create an authorization scope for forensic custody
+# 5. Export RFC 7946 GeoJSON FeatureCollection with trajectory LineStrings for GIS/QGIS
+python -m matazero locate ./case_photos -a -r -f geojson -o case_evidence.geojson
+
+# 6. Export standard GPX 1.1 tracks for GPS track analysis
+python -m matazero locate ./case_photos -a -r -f gpx -o evidence_track.gpx
+
+# 7. Extract all embedded artefacts, previews, metadata streams, and payloads
+python -m matazero extract photo.jpg -o ./extracted_assets -a
+
+# 8. Extract a region crop and pixel color at specific -x, -y coordinates
+python -m matazero extract photo.jpg -x 150 -y 200 -w 300 -h 300 -o ./crops
+
+# 9. Complex batch query: recursive directory scan, filtered by GPS, with 8 worker threads
+python -m matazero analyze ./evidence_drive -a -r --glob "*.jpg" --filter "has_gps" -j 8 -f json -o results.json
+
+# 10. Probe container segments and metadata tag/value byte locations
+python -m matazero probe photo.jpg
+
+# 11. Create an authorization scope for forensic custody
 python -m matazero scope create -c "CASE-2026-01" -p "Forensic Ingest" -l "Warrant" -a "Lead Investigator" -o scope.json
 python -m matazero scope validate scope.json
 
-# 6. Run scoped analysis under legal custody
+# 12. Run scoped analysis under legal custody
 python -m matazero analyze evidence.jpg -s scope.json
 
-# 7. Learn a new camera hardware fingerprint from a reference shot
+# 13. Learn a new camera hardware fingerprint from a reference shot
 python -m matazero corpus learn ref_shot.jpg -i canon_r5 -m "Canon EOS R5" -e "DIGIC X Hardware ISP"
 
-# 8. List all registered device and platform profiles
-python -m matazero corpus list
-
-# 9. Probe container segments with exact byte offsets
-python -m matazero probe photo.jpg
-
-# 10. Verify audit log tamper-resistance
+# 14. Verify audit log tamper-resistance
 python -m matazero audit verify ./audit.jsonl
 
-# 11. Losslessly strip metadata while preserving raw pixel streams
+# 15. Losslessly strip metadata while preserving raw pixel streams
 python -m matazero clean photo.jpg -o cleaned.jpg -c
 ```
 
@@ -242,7 +256,27 @@ python -m matazero clean photo.jpg -o cleaned.jpg -c
 | `analyze` | `-t` | `--tiers` | Comma-separated list of tiers to run (e.g. `1,2,3,4,7`) |
 | `analyze` | `-e` | `--ela` | Enable Error Level Analysis (Tier 6) |
 | `analyze` | `-c` | `--carve` | Automatically extract trailing payloads / archives |
-| `analyze` | `-n` | `--allow-network` | Enable disclosed network lookups |
+| `analyze` | `-n` | `--allow-network` | Enable disclosed network lookups (GR-4.1) |
+| `analyze` | `-r` | `--recursive` | Recursively scan directory targets for images |
+| `analyze` | | `--glob` | Filter files by pattern (e.g. `*.jpg`, `**/*.png`) |
+| `analyze` | | `--filter` | Filter records (e.g. `has_gps`, `has_payload`, `authentic=false`) |
+| `analyze` | | `--select-fields`| Comma-separated metadata fields to retain |
+| `analyze` | `-j` | `--jobs` | Number of parallel worker threads (default: 1) |
+| `locate` | `-o` | `--out` | Write geolocation output to specified file |
+| `locate` | `-f` | `--format` | Output format: `table`, `report`, `json`, `geojson`, `html`, `gpx` |
+| `locate` | `-n` | `--allow-network` | Enable online reverse geocoding via OpenStreetMap |
+| `locate` | `-r` | `--recursive` | Recursively search directory targets for images |
+| `locate` | | `--glob` | Filter files by pattern (e.g. `*.jpg`) |
+| `extract` | `-o` | `--out` | Destination directory for extracted items |
+| `extract` | `-a` | `--all` | Extract all embedded artefacts, metadata blocks, and payloads |
+| `extract` | `-t` | `--thumbnail` | Extract embedded IFD1 thumbnail |
+| `extract` | `-p` | `--preview` | Extract RAW preview / MPF secondary images |
+| `extract` | `-c` | `--payload` | Carve and extract trailing payload archives |
+| `extract` | `-m` | `--metadata` | Extract raw metadata blocks (EXIF, XMP, IPTC, ICC, C2PA) |
+| `extract` | `-x` | `--x-pos` | X coordinate for region/pixel extraction |
+| `extract` | `-y` | `--y-pos` | Y coordinate for region/pixel extraction |
+| `extract` | `-w` | `--width` | Width for crop region (default: 200) |
+| `extract` | `-h` | `--height` | Height for crop region (default: 200) |
 | `corpus learn` | `-i` | `--id` | Unique profile ID |
 | `corpus learn` | `-m` | `--model` | Camera or device model description |
 | `corpus learn` | `-e` | `--encoder` | Software or hardware encoder name |

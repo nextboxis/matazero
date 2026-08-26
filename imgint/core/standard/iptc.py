@@ -106,6 +106,9 @@ class IptcParser(BlockParser):
             tag_key = (record_num, dataset_num)
             tag_name = IPTC_TAGS.get(tag_key, f"Dataset_{record_num}:{dataset_num}")
 
+            tag_abs_offset = base_offset + curr
+            val_abs_offset = base_offset + val_offset
+
             fields.append(
                 Field(
                     standard="IPTC",
@@ -114,6 +117,9 @@ class IptcParser(BlockParser):
                     value=val_str,
                     raw_value=val_bytes.hex(),
                     value_type="STRING",
+                    offset=tag_abs_offset,
+                    value_offset=val_abs_offset,
+                    length=record_len,
                 )
             )
 

@@ -85,6 +85,51 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
                 "average_divergence": round(avg_diff, 2),
             }
 
+        if "crop" in tasks:
+            x = int(input_data.get("x", 0))
+            y = int(input_data.get("y", 0))
+            w = int(input_data.get("width", 100))
+            h = int(input_data.get("height", 100))
+            crop_out = input_data.get("crop_out_path")
+
+            box_x1 = max(0, min(width - 1, x))
+            box_y1 = max(0, min(height - 1, y))
+            box_x2 = max(box_x1 + 1, min(width, x + w))
+            box_y2 = max(box_y1 + 1, min(height, y + h))
+
+            cropped_img = img_rgb.crop((box_x1, box_y1, box_x2, box_y2))
+            if crop_out:
+                Path(crop_out).parent.mkdir(parents=True, exist_ok=True)
+                cropped_img.save(crop_out)
+
+            results["tasks"]["crop"] = {
+                "x": x,
+                "y": y,
+                "width": box_x2 - box_x1,
+                "height": box_y2 - box_y1,
+                "box": [box_x1, box_y1, box_x2, box_y2],
+                "output_path": crop_out,
+            }
+
+        if "pixel_at_xy" in tasks:
+            px = int(input_data.get("x", 0))
+            py = int(input_data.get("y", 0))
+            if 0 <= px < width and 0 <= py < height:
+                pix = img_rgb.getpixel((px, py))
+                r, g, b = pix[:3]
+                results["tasks"]["pixel_at_xy"] = {
+                    "x": px,
+                    "y": py,
+                    "rgb": [r, g, b],
+                    "hex": f"#{r:02X}{g:02X}{b:02X}",
+                }
+            else:
+                results["tasks"]["pixel_at_xy"] = {
+                    "x": px,
+                    "y": py,
+                    "error": f"Coordinates ({px}, {py}) out of bounds ({width}x{height})",
+                }
+
     except Exception as e:
         return {"success": False, "error": str(e)}
 

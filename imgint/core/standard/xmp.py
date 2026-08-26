@@ -53,6 +53,9 @@ class XmpParser(BlockParser):
 
                 text = (elem.text or "").strip()
                 if text and tag_name not in ("RDF", "Description", "xmpmeta"):
+                    text_idx = xml_text.find(text)
+                    val_abs_offset = block.offset + text_idx if text_idx != -1 else block.offset
+                    val_len = len(text.encode("utf-8", errors="replace"))
                     fields.append(
                         Field(
                             standard="XMP",
@@ -61,6 +64,9 @@ class XmpParser(BlockParser):
                             value=text,
                             raw_value=text,
                             value_type="STRING",
+                            offset=block.offset,
+                            value_offset=val_abs_offset,
+                            length=val_len,
                         )
                     )
 
@@ -68,6 +74,10 @@ class XmpParser(BlockParser):
                 for attr_key, attr_val in elem.attrib.items():
                     attr_name = attr_key.split("}", 1)[1] if "}" in attr_key else attr_key
                     if attr_val and not attr_name.startswith("xmlns"):
+                        val_str = str(attr_val)
+                        val_idx = xml_text.find(val_str)
+                        val_abs_offset = block.offset + val_idx if val_idx != -1 else block.offset
+                        val_len = len(val_str.encode("utf-8", errors="replace"))
                         fields.append(
                             Field(
                                 standard="XMP",
@@ -76,6 +86,9 @@ class XmpParser(BlockParser):
                                 value=attr_val,
                                 raw_value=attr_val,
                                 value_type="STRING",
+                                offset=block.offset,
+                                value_offset=val_abs_offset,
+                                length=val_len,
                             )
                         )
                         if attr_name.lower() in ("modifydate", "createdate", "metadatadate", "history", "creator", "format"):
@@ -90,7 +103,8 @@ class XmpParser(BlockParser):
                                     provenance=Provenance(
                                         source_layer="standard",
                                         extractor="xmp_parser",
-                                        offset=block.offset,
+                                        offset=val_abs_offset,
+                                        length=val_len,
                                         standard="XMP",
                                         tag_id=attr_key,
                                     ),

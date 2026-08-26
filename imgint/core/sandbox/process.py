@@ -23,13 +23,16 @@ class SandboxRunner:
         cls,
         file_path: str | Path,
         tasks: Optional[List[str]] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> Dict[str, Any]:
         req_tasks = tasks or ["dimensions", "phashes", "dominant_colors", "entropy"]
-        payload = {
+        payload: Dict[str, Any] = {
             "file_path": str(Path(file_path).resolve()),
             "tasks": req_tasks,
         }
+        if extra_params:
+            payload.update(extra_params)
         input_json = json.dumps(payload)
 
         # Ensure child process can always locate imgint package
@@ -39,6 +42,8 @@ class SandboxRunner:
         env = os.environ.copy()
         existing_pythonpath = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = f"{repo_root}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else repo_root
+
+        cmd = [sys.executable, "-m", "imgint.core.sandbox.worker"]
 
         try:
             proc = subprocess.Popen(

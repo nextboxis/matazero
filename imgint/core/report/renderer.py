@@ -83,10 +83,20 @@ class ReportRenderer:
                 lon = val.get("longitude")
                 lat_ref = val.get("latitude_ref", "")
                 lon_ref = val.get("longitude_ref", "")
+                x_val = val.get("x")
+                y_val = val.get("y")
+                x_loc = val.get("x_value_location", {})
+                y_loc = val.get("y_value_location", {})
                 alt = val.get("altitude_m") or val.get("altitude_meters")
                 place = val.get("nearest_place") or val.get("closest_city")
                 cc = val.get("country_code") or val.get("country")
                 lines.append(f"     Coordinates:      {lat}° {lat_ref}, {lon}° {lon_ref}".strip())
+                if x_val is not None and y_val is not None:
+                    lines.append(f"     X / Y Location:   X={x_val} (Lon), Y={y_val} (Lat)")
+                if x_loc.get("value_offset") is not None or y_loc.get("value_offset") is not None:
+                    x_off_s = f"0x{x_loc['value_offset']:X}" if x_loc.get("value_offset") is not None else "N/A"
+                    y_off_s = f"0x{y_loc['value_offset']:X}" if y_loc.get("value_offset") is not None else "N/A"
+                    lines.append(f"     Value Offsets:    X @ {x_off_s}, Y @ {y_off_s}")
                 if place:
                     lines.append(f"     Location (Est):   {place}" + (f", {cc}" if cc else ""))
                 if alt is not None:
@@ -227,7 +237,12 @@ class ReportRenderer:
             if t == 1 and record.fields:
                 lines.append(f" • Extracted Metadata Fields ({len(record.fields)} total):")
                 for fld in record.fields[:15]:
-                    lines.append(f"     {fld.name:24} : {fld.value} ({fld.standard})")
+                    loc_s = ""
+                    if fld.value_offset is not None:
+                        loc_s = f" [Val @ 0x{fld.value_offset:X}]"
+                    elif fld.offset is not None:
+                        loc_s = f" [Tag @ 0x{fld.offset:X}]"
+                    lines.append(f"     {fld.name:24} : {fld.value} ({fld.standard}){loc_s}")
                 if len(record.fields) > 15:
                     lines.append(f"     ... and {len(record.fields) - 15} additional fields preserved in structured output.")
                 lines.append("")

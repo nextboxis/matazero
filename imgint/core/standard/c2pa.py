@@ -65,6 +65,9 @@ class C2paParser(BlockParser):
                 value=has_jumbf,
                 raw_value=has_jumbf,
                 value_type="BOOL",
+                offset=block.offset,
+                value_offset=block.offset,
+                length=block.length,
             )
         )
         if actions_found:
@@ -75,6 +78,9 @@ class C2paParser(BlockParser):
                     value=", ".join(actions_found),
                     raw_value=actions_found,
                     value_type="STRING",
+                    offset=block.offset,
+                    value_offset=block.offset,
+                    length=block.length,
                 )
             )
 

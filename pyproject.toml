@@ -26,6 +26,9 @@ dependencies = [
     "numpy>=1.20.0",
     "imagehash>=4.2.0",
     "cryptography>=3.4.0",
+    "timezonefinder>=6.0.0",
+    "geopy>=2.3.0",
+    "astral>=3.2",
 ]
 
 [project.optional-dependencies]

@@ -47,13 +47,13 @@ class IccParser(BlockParser):
         device_mfg = data[48:52].decode("ascii", errors="replace").strip()
         device_model = data[52:56].decode("ascii", errors="replace").strip()
 
-        fields.append(Field(standard="ICC", name="ProfileSize", value=profile_size, raw_value=profile_size, value_type="INT"))
-        fields.append(Field(standard="ICC", name="Version", value=f"{version_major}.{version_minor}", raw_value=data[8:12].hex(), value_type="STRING"))
-        fields.append(Field(standard="ICC", name="DeviceClass", value=profile_class, raw_value=profile_class, value_type="STRING"))
-        fields.append(Field(standard="ICC", name="ColorSpace", value=color_space, raw_value=color_space, value_type="STRING"))
-        fields.append(Field(standard="ICC", name="ConnectionSpace", value=connection_space, raw_value=connection_space, value_type="STRING"))
-        fields.append(Field(standard="ICC", name="DeviceManufacturer", value=device_mfg, raw_value=device_mfg, value_type="STRING"))
-        fields.append(Field(standard="ICC", name="DeviceModel", value=device_model, raw_value=device_model, value_type="STRING"))
+        fields.append(Field(standard="ICC", name="ProfileSize", value=profile_size, raw_value=profile_size, value_type="INT", offset=block.offset, value_offset=block.offset, length=4))
+        fields.append(Field(standard="ICC", name="Version", value=f"{version_major}.{version_minor}", raw_value=data[8:12].hex(), value_type="STRING", offset=block.offset, value_offset=block.offset + 8, length=4))
+        fields.append(Field(standard="ICC", name="DeviceClass", value=profile_class, raw_value=profile_class, value_type="STRING", offset=block.offset, value_offset=block.offset + 12, length=4))
+        fields.append(Field(standard="ICC", name="ColorSpace", value=color_space, raw_value=color_space, value_type="STRING", offset=block.offset, value_offset=block.offset + 16, length=4))
+        fields.append(Field(standard="ICC", name="ConnectionSpace", value=connection_space, raw_value=connection_space, value_type="STRING", offset=block.offset, value_offset=block.offset + 20, length=4))
+        fields.append(Field(standard="ICC", name="DeviceManufacturer", value=device_mfg, raw_value=device_mfg, value_type="STRING", offset=block.offset, value_offset=block.offset + 48, length=4))
+        fields.append(Field(standard="ICC", name="DeviceModel", value=device_model, raw_value=device_model, value_type="STRING", offset=block.offset, value_offset=block.offset + 52, length=4))
 
         findings.append(
             Finding(

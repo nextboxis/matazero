@@ -25,13 +25,17 @@ class AnalysisContext:
     allow_network: bool = False
     enable_ela: bool = False
 
-    def get_field_value(self, name: str) -> Optional[Any]:
+    def get_field(self, name: str) -> Optional[Field]:
         n_low = name.lower()
         for f in self.fields:
             f_low = f.name.lower()
             if f_low == n_low or f_low.endswith(f":{n_low}"):
-                return f.value
+                return f
         return None
+
+    def get_field_value(self, name: str) -> Optional[Any]:
+        f = self.get_field(name)
+        return f.value if f else None
 
     def get_finding(self, name: str) -> Optional[Finding]:
         for f in self.existing_findings:

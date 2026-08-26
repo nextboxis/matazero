@@ -131,10 +131,13 @@ class ExifParser(BlockParser):
             entry_count = struct.unpack(f"{endian}H", data[ifd_offset : ifd_offset + 2])[0]
             curr = ifd_offset + 2
 
+            TYPE_SIZES = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8}
+
             for _ in range(entry_count):
                 if curr + 12 > size:
                     break
 
+                entry_rel_offset = curr
                 tag_id, field_type, count, val_or_offset = struct.unpack(
                     f"{endian}HHI I", data[curr : curr + 12]
                 )
@@ -142,11 +145,22 @@ class ExifParser(BlockParser):
 
                 tag_hex = f"0x{tag_id:04X}"
                 tag_name = EXIF_TAGS.get(tag_id, f"Tag_{tag_hex}")
+                type_size = TYPE_SIZES.get(field_type, 1)
+                total_val_bytes = count * type_size
+
+                tag_abs_offset = block.offset + entry_rel_offset
+                if total_val_bytes <= 4:
+                    val_abs_offset = block.offset + entry_rel_offset + 8
+                    val_len = total_val_bytes
+                else:
+                    val_abs_offset = block.offset + val_or_offset
+                    val_len = total_val_bytes
 
                 # FR-2.10: Preserve MakerNote as opaque blob
                 if tag_id == 0x927C:
                     maker_offset = val_or_offset
                     maker_len = count
+                    maker_abs_offset = block.offset + maker_offset if maker_offset < size else block.offset
                     fields.append(
                         Field(
                             standard="EXIF",
@@ -156,12 +170,15 @@ class ExifParser(BlockParser):
                             raw_value=maker_offset,
                             value_type="OPAQUE_BLOB",
                             description="Preserved as opaque blob without interpretation per FR-2.10",
+                            offset=tag_abs_offset,
+                            value_offset=maker_abs_offset,
+                            length=maker_len,
                         )
                     )
                     findings.append(
                         Finding(
                             name="exif_makernote_present",
-                            value={"offset": maker_offset, "length": maker_len},
+                            value={"offset": maker_offset, "length": maker_len, "absolute_value_offset": maker_abs_offset},
                             tier=1,
                             extractor="exif_parser",
                             confidence=Confidence.OBSERVED,
@@ -169,7 +186,7 @@ class ExifParser(BlockParser):
                             provenance=Provenance(
                                 source_layer="standard",
                                 extractor="exif_parser",
-                                offset=block.offset + maker_offset if maker_offset < size else block.offset,
+                                offset=maker_abs_offset,
                                 length=maker_len,
                                 standard="EXIF",
                                 tag_id=tag_hex,
@@ -200,10 +217,13 @@ class ExifParser(BlockParser):
                             value=val,
                             raw_value=val_or_offset,
                             value_type=val_type_name,
+                            offset=tag_abs_offset,
+                            value_offset=val_abs_offset,
+                            length=val_len,
                         )
                     )
                     # Produce Tier-1 observed finding for prominent metadata tags
-                    if tag_id in (0x010F, 0x0110, 0x0131, 0x0132, 0x9003, 0x9004, 0xA434, 0x0002, 0x0004, 0x0006, 0x0007, 0x001D):
+                    if tag_id in (0x010F, 0x0110, 0x0131, 0x0132, 0x9003, 0x9004, 0xA434, 0x0002, 0x0004, 0x0006, 0x0007, 0x001D, 0x011A, 0x011B, 0xA002, 0xA003):
                         findings.append(
                             Finding(
                                 name=f"exif_{tag_name.lower()}",
@@ -215,7 +235,8 @@ class ExifParser(BlockParser):
                                 provenance=Provenance(
                                     source_layer="standard",
                                     extractor="exif_parser",
-                                    offset=block.offset + ifd_offset,
+                                    offset=val_abs_offset,
+                                    length=val_len,
                                     standard="EXIF",
                                     tag_id=tag_hex,
                                 ),
