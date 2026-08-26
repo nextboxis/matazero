@@ -8,6 +8,7 @@ from imgint.core.standard.iptc import IptcParser
 from imgint.core.standard.icc import IccParser
 from imgint.core.standard.c2pa import C2paParser
 from imgint.core.standard.png_native import PngNativeParser
+from imgint.core.standard.office_props import OfficePropertiesParser
 
 
 def create_default_standard_registry() -> StandardRegistry:
@@ -18,6 +19,7 @@ def create_default_standard_registry() -> StandardRegistry:
     reg.register(IccParser())
     reg.register(C2paParser())
     reg.register(PngNativeParser())
+    reg.register(OfficePropertiesParser())
     return reg
 
 
@@ -30,5 +32,6 @@ __all__ = [
     "IccParser",
     "C2paParser",
     "PngNativeParser",
+    "OfficePropertiesParser",
     "create_default_standard_registry",
 ]

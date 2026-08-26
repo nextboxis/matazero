@@ -140,6 +140,7 @@ class AnalysisPipeline:
 
         units, blocks, container_diags = container_reader.read(reader)
         record.structural_units = units
+        record.metadata_blocks = blocks
         record.diagnostics.extend(container_diags)
 
         # Standard Metadata Parsing (Tier 1)

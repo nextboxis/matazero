@@ -146,9 +146,45 @@ class ArtefactExtractor:
                     )
                 )
 
-        # 4. Extract Raw Metadata Blocks (EXIF, XMP, IPTC, ICC, C2PA)
+        # 4. Extract Raw Metadata Blocks & Office Assets
         if include_metadata:
             for idx, b in enumerate(blocks):
+                # Handle embedded presentation images (PPTX / DOCX / XLSX)
+                if b.kind == "EMBEDDED_IMAGE":
+                    img_name = Path(b.source_unit).name if b.source_unit else f"image_{idx + 1}.png"
+                    m_file = destination / f"{stem}_{img_name}"
+                    m_file.write_bytes(b.raw_bytes)
+                    h = hashlib.sha256(b.raw_bytes).hexdigest()
+                    extracted.append(
+                        ExtractedItem(
+                            item_type="embedded_slide_image",
+                            output_path=str(m_file),
+                            size_bytes=len(b.raw_bytes),
+                            offset=b.offset,
+                            sha256=h,
+                            details={"image_name": img_name, "source_unit": b.source_unit},
+                        )
+                    )
+                    continue
+
+                # Handle office speaker notes
+                if b.kind == "OFFICE_SPEAKER_NOTES":
+                    note_name = Path(b.source_unit).stem if b.source_unit else f"note_{idx + 1}"
+                    n_file = destination / f"{stem}_{note_name}.txt"
+                    n_file.write_bytes(b.raw_bytes)
+                    h = hashlib.sha256(b.raw_bytes).hexdigest()
+                    extracted.append(
+                        ExtractedItem(
+                            item_type="office_speaker_notes",
+                            output_path=str(n_file),
+                            size_bytes=len(b.raw_bytes),
+                            offset=b.offset,
+                            sha256=h,
+                            details={"source_unit": b.source_unit},
+                        )
+                    )
+                    continue
+
                 kind_clean = b.kind.lower().replace("/", "_")
                 ext_map = {
                     "exif": "exif",
@@ -162,6 +198,8 @@ class ArtefactExtractor:
                     "c2pa": "c2pa",
                     "jumbf": "jumbf",
                     "png_text": "txt",
+                    "office_core_properties": "xml",
+                    "office_app_properties": "xml",
                 }
                 m_ext = ext_map.get(kind_clean, "bin")
                 m_file = destination / f"{stem}_meta_{idx + 1}_{kind_clean}_0x{b.offset:X}.{m_ext}"

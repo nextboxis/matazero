@@ -196,50 +196,59 @@ Commands:
 ### Common Usage Examples
 
 ```bash
-# 1. Quick analysis on an image (Self-Audit mode for personal files)
+# 1. Quick analysis: Clean Visual Executive Dashboard (Self-Audit mode for personal files)
 python -m matazero analyze photo.jpg -a
 
-# 2. Forensic Geolocation: Coordinates, reverse geocoding, solar angles & map links
+# 2. Deep Forensic Tree Breakdown: Full 7 tiers, complete tag & value byte locations
+python -m matazero analyze photo.jpg -a --deep
+
+# 3. Analyze PowerPoint (.pptx) or Word (.docx) presentation / document
+python -m matazero analyze presentation.pptx -a
+
+# 4. Extract all embedded slide images, speaker notes, and metadata from PowerPoint (.pptx)
+python -m matazero extract presentation.pptx -a -o ./extracted_presentation_media
+
+# 5. Forensic Geolocation: Coordinates, reverse geocoding, solar angles & map links
 python -m matazero locate photo.jpg -a
 
-# 3. Multi-image spatial relation, geodesic distance, velocity & travel anomaly check
+# 6. Multi-image spatial relation, geodesic distance, velocity & travel anomaly check
 python -m matazero locate photo1.jpg photo2.jpg -a
 
-# 4. Generate an interactive standalone Leaflet / OpenStreetMap HTML dossier map
+# 7. Generate an interactive standalone Leaflet / OpenStreetMap HTML dossier map
 python -m matazero locate ./case_photos -a -r -f html -o dossier_map.html
 
-# 5. Export RFC 7946 GeoJSON FeatureCollection with trajectory LineStrings for GIS/QGIS
+# 8. Export RFC 7946 GeoJSON FeatureCollection with trajectory LineStrings for GIS/QGIS
 python -m matazero locate ./case_photos -a -r -f geojson -o case_evidence.geojson
 
-# 6. Export standard GPX 1.1 tracks for GPS track analysis
+# 9. Export standard GPX 1.1 tracks for GPS track analysis
 python -m matazero locate ./case_photos -a -r -f gpx -o evidence_track.gpx
 
-# 7. Extract all embedded artefacts, previews, metadata streams, and payloads
+# 10. Extract all embedded artefacts, previews, metadata streams, and payloads
 python -m matazero extract photo.jpg -o ./extracted_assets -a
 
-# 8. Extract a region crop and pixel color at specific -x, -y coordinates
+# 11. Extract a region crop and pixel color at specific -x, -y coordinates
 python -m matazero extract photo.jpg -x 150 -y 200 -w 300 -h 300 -o ./crops
 
-# 9. Complex batch query: recursive directory scan, filtered by GPS, with 8 worker threads
+# 12. Complex batch query: recursive directory scan, filtered by GPS, with 8 worker threads
 python -m matazero analyze ./evidence_drive -a -r --glob "*.jpg" --filter "has_gps" -j 8 -f json -o results.json
 
-# 10. Probe container segments and metadata tag/value byte locations
+# 13. Probe container segments and metadata tag/value byte locations
 python -m matazero probe photo.jpg
 
-# 11. Create an authorization scope for forensic custody
+# 14. Create an authorization scope for forensic custody
 python -m matazero scope create -c "CASE-2026-01" -p "Forensic Ingest" -l "Warrant" -a "Lead Investigator" -o scope.json
 python -m matazero scope validate scope.json
 
-# 12. Run scoped analysis under legal custody
+# 15. Run scoped analysis under legal custody
 python -m matazero analyze evidence.jpg -s scope.json
 
-# 13. Learn a new camera hardware fingerprint from a reference shot
+# 16. Learn a new camera hardware fingerprint from a reference shot
 python -m matazero corpus learn ref_shot.jpg -i canon_r5 -m "Canon EOS R5" -e "DIGIC X Hardware ISP"
 
-# 14. Verify audit log tamper-resistance
+# 17. Verify audit log tamper-resistance
 python -m matazero audit verify ./audit.jsonl
 
-# 15. Losslessly strip metadata while preserving raw pixel streams
+# 18. Losslessly strip metadata while preserving raw pixel streams
 python -m matazero clean photo.jpg -o cleaned.jpg -c
 ```
 
@@ -251,14 +260,16 @@ python -m matazero clean photo.jpg -o cleaned.jpg -c
 | :--- | :--- | :--- | :--- |
 | `analyze` | `-s` | `--scope` | Path to authorization scope JSON |
 | `analyze` | `-a` | `--self-audit` | Run in self-audit mode without an external scope |
-| `analyze` | `-f` | `--format` | Output format: `report`, `json`, `ndjson`, `table`, `html` |
+| `analyze` | | `--deep`, `--details`| Display full hierarchical forensic tree with all 7 tiers |
+| `analyze` | | `--summary` | Display executive visual summary dashboard |
+| `analyze` | `-f` | `--format` | Output format: `report`, `dashboard`, `deep`, `summary`, `text`, `json`, `ndjson`, `table`, `html` |
 | `analyze` | `-o` | `--out` | Write output to specified file |
 | `analyze` | `-t` | `--tiers` | Comma-separated list of tiers to run (e.g. `1,2,3,4,7`) |
 | `analyze` | `-e` | `--ela` | Enable Error Level Analysis (Tier 6) |
 | `analyze` | `-c` | `--carve` | Automatically extract trailing payloads / archives |
 | `analyze` | `-n` | `--allow-network` | Enable disclosed network lookups (GR-4.1) |
 | `analyze` | `-r` | `--recursive` | Recursively scan directory targets for images |
-| `analyze` | | `--glob` | Filter files by pattern (e.g. `*.jpg`, `**/*.png`) |
+| `analyze` | | `--glob` | Filter files by pattern (e.g. `*.jpg`, `**/*.png`, `*.pptx`) |
 | `analyze` | | `--filter` | Filter records (e.g. `has_gps`, `has_payload`, `authentic=false`) |
 | `analyze` | | `--select-fields`| Comma-separated metadata fields to retain |
 | `analyze` | `-j` | `--jobs` | Number of parallel worker threads (default: 1) |

@@ -32,6 +32,7 @@ from imgint.core.fingerprint.subsampling import SubsamplingExtractor
 from imgint.core.fingerprint.order import SegmentOrderExtractor
 from imgint.core.geo.locator import GeoLocator
 from imgint.core.geo.exporter import GeoExporter
+from imgint.core.report.cli_dashboard import CliDashboard
 import concurrent.futures
 
 try:
@@ -114,7 +115,8 @@ def scope_validate(scope_file: str, secret: Optional[str]) -> None:
 # Subcommand: analyze
 IMAGE_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".webp", ".heic", ".tiff", ".tif",
-    ".cr2", ".nef", ".arw", ".dng", ".jxl", ".avif", ".bmp", ".gif"
+    ".cr2", ".nef", ".arw", ".dng", ".jxl", ".avif", ".bmp", ".gif",
+    ".pptx", ".ppsx", ".docx", ".xlsx", ".zip", ".odp", ".psd", ".svg"
 }
 
 
@@ -180,7 +182,9 @@ def _apply_field_selection(rec, select_fields: Optional[str]) -> None:
 @click.option("-s", "--scope", "scope_path", default=lambda: os.environ.get("IMGINT_SCOPE"), help="Path to authorization scope JSON")
 @click.option("-a", "--self-audit", is_flag=True, help="Operate in self-audit mode on personal files without a scope")
 @click.option("-t", "--tiers", default="1,2,3,4,5,6,7", help="Comma-separated tier list (e.g. 1,2,3)")
-@click.option("-f", "--format", "out_fmt", type=click.Choice(["report", "json", "ndjson", "table", "html"]), default="report", help="Output format")
+@click.option("-f", "--format", "out_fmt", type=click.Choice(["report", "dashboard", "deep", "summary", "text", "json", "ndjson", "table", "html"]), default="report", help="Output format")
+@click.option("--deep", "--details", "deep_mode", is_flag=True, help="Display exhaustive hierarchical forensic tree breakdown")
+@click.option("--summary", is_flag=True, help="Display executive visual summary dashboard")
 @click.option("--store", "store_path", default="./evidence_store", help="Evidence store directory")
 @click.option("--audit-log", "audit_path", default="./audit.jsonl", help="Audit log file path")
 @click.option("-n", "--allow-network", is_flag=True, help="Enable disclosed external lookups (GR-4.1)")
@@ -199,6 +203,8 @@ def analyze(
     self_audit: bool,
     tiers: str,
     out_fmt: str,
+    deep_mode: bool,
+    summary: bool,
     store_path: str,
     audit_path: str,
     allow_network: bool,
@@ -311,7 +317,15 @@ def analyze(
         return
 
     # Render output
-    if out_fmt == "json":
+    if deep_mode or out_fmt == "deep":
+        for r in records:
+            CliDashboard.render_deep_tree(r, console)
+        rendered = ""
+    elif summary or out_fmt in ("dashboard", "summary"):
+        for r in records:
+            CliDashboard.render_summary_dashboard(r, console)
+        rendered = ""
+    elif out_fmt == "json":
         rendered = ReportRenderer.render_json(records)
     elif out_fmt == "ndjson":
         rendered = ReportRenderer.render_ndjson(records)
@@ -327,8 +341,14 @@ def analyze(
             table.add_row(r.file_path, r.mime_type, str(len(r.findings)), r.sha256[:16] + "...")
         console.print(table)
         rendered = ""
-    else:  # report
-        rendered = "\n\n".join(ReportRenderer.render_report(r) for r in records)
+    else:  # report / text
+        if out_file or out_fmt == "text":
+            rendered = "\n\n".join(ReportRenderer.render_report(r) for r in records)
+        else:
+            # Interactive terminal report: render clean executive summary dashboard
+            for r in records:
+                CliDashboard.render_summary_dashboard(r, console)
+            rendered = ""
 
     if rendered:
         if out_file:
@@ -389,6 +409,31 @@ def locate(
         try:
             rec = pipeline.analyze_file(t_path)
             gps_finding = next((f for f in rec.findings if f.name == "gps_coordinates_claimed"), None)
+            if not gps_finding:
+                # Check embedded slide images inside presentations/documents
+                for blk in rec.metadata_blocks:
+                    if blk.kind == "EMBEDDED_IMAGE" and blk.raw_bytes:
+                        try:
+                            from imgint.core.standard.exif import ExifParser
+                            sub_r = BoundedReader(blk.raw_bytes)
+                            sub_d = FormatDetector.detect(sub_r)
+                            if sub_d.is_supported:
+                                sub_reg = create_default_container_registry()
+                                sub_cr = sub_reg.get_reader(sub_d.format_name)
+                                if sub_cr:
+                                    _, sub_blks, _ = sub_cr.read(sub_r)
+                                    for sb in sub_blks:
+                                        if sb.kind in ("EXIF", "TIFF_EXIF"):
+                                            _, sub_fnds, _ = ExifParser().parse(sb)
+                                            sub_gps = next((f for f in sub_fnds if f.name == "gps_coordinates_claimed"), None)
+                                            if sub_gps and sub_gps.value.get("latitude") is not None:
+                                                gps_finding = sub_gps
+                                                break
+                        except Exception:
+                            pass
+                    if gps_finding:
+                        break
+
             if not gps_finding:
                 continue
 

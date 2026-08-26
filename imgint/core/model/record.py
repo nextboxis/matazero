@@ -114,6 +114,7 @@ class AnalysisRecord:
     findings: List[Finding] = field(default_factory=list)
     diagnostics: List[Diagnostic] = field(default_factory=list)
     structural_units: List[StructuralUnit] = field(default_factory=list)
+    metadata_blocks: List[MetadataBlock] = field(default_factory=list)
     fields: List[Field] = field(default_factory=list)
     not_established: List[str] = field(default_factory=list)
     authenticity_verdict: Optional[Dict[str, Any]] = None

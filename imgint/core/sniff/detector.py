@@ -119,6 +119,46 @@ class FormatDetector:
                 expected_extensions=[".psd"],
             )
 
+        # Check Office OpenXML / ZIP Packages (PPTX, DOCX, XLSX, ZIP)
+        if len(head) >= 4 and head[:4] == b"PK\x03\x04":
+            preview_bytes = reader.read_bytes(0, min(reader.size, 65536))
+            if b"ppt/" in preview_bytes or b"presentation" in preview_bytes:
+                return DetectedFormat(
+                    format_name="PPTX",
+                    mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    is_supported=True,
+                    magic_bytes=head[:4],
+                    magic_hex=magic_hex,
+                    expected_extensions=[".pptx", ".ppsx", ".potx", ".pptm"],
+                )
+            elif b"word/" in preview_bytes or b"document" in preview_bytes:
+                return DetectedFormat(
+                    format_name="DOCX",
+                    mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    is_supported=True,
+                    magic_bytes=head[:4],
+                    magic_hex=magic_hex,
+                    expected_extensions=[".docx", ".dotx", ".docm"],
+                )
+            elif b"xl/" in preview_bytes or b"workbook" in preview_bytes:
+                return DetectedFormat(
+                    format_name="XLSX",
+                    mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    is_supported=True,
+                    magic_bytes=head[:4],
+                    magic_hex=magic_hex,
+                    expected_extensions=[".xlsx", ".xltx", ".xlsm"],
+                )
+            else:
+                return DetectedFormat(
+                    format_name="ZIP",
+                    mime_type="application/zip",
+                    is_supported=True,
+                    magic_bytes=head[:4],
+                    magic_hex=magic_hex,
+                    expected_extensions=[".zip", ".odp", ".odt", ".ods", ".apk", ".jar"],
+                )
+
         # Check SVG (XML text)
         try:
             head_str = head.decode("utf-8", errors="ignore").strip().lower()
