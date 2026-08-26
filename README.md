@@ -79,7 +79,10 @@ Even when social media platforms strip EXIF metadata, `matazero` analyzes the un
 git clone https://github.com/nextboxis/matazero.git
 cd matazero
 
-# Install in editable mode
+# Install dependencies
+pip install -r requirements.txt
+
+# Or install in editable mode
 pip install -e .
 ```
 
