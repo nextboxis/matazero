@@ -1,6 +1,15 @@
+```text
+ ███╗   ███╗ █████╗ ████████╗ █████╗ ███████╗███████╗██████╗  ██████╗ 
+ ████╗ ████║██╔══██╗╚══██╔══╝██╔══██╗╚══███╔╝██╔════╝██╔══██╗██╔═══██╗
+ ██╔████╔██║███████║   ██║   ███████║  ███╔╝ █████╗  ██████╔╝██║   ██║
+ ██║╚██╔╝██║██╔══██║   ██║   ██╔══██║ ███╔╝  ██╔══╝  ██╔══██╗██║   ██║
+ ██║ ╚═╝ ██║██║  ██║   ██║   ██║  ██║███████╗███████╗██║  ██║╚██████╔╝
+ ╚═╝     ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ 
+```
+
 # matazero
 
-**Image Intelligence & Forensic Analysis Toolkit for OSINT and Digital Forensics**
+> **Image Intelligence & Forensic Analysis Toolkit for OSINT and Digital Forensics**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
