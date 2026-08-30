@@ -81,7 +81,21 @@ Even when social media platforms strip EXIF metadata, `matazero` analyzes the un
 
 ---
 
-### Option 1: Install from Source (Recommended)
+### ⚡ Quick Install (Automated One-Liner)
+
+**Linux, Kali Linux & macOS:**
+```bash
+git clone https://github.com/nextboxis/matazero.git && cd matazero && chmod +x install.sh && ./install.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+git clone https://github.com/nextboxis/matazero.git; cd matazero; .\install.ps1
+```
+
+---
+
+### Option 1: Manual Install from Source
 
 ```bash
 # 1. Clone the repository
