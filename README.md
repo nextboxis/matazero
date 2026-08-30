@@ -362,17 +362,16 @@ python -m matazero analyze suspect.jpg -a --ollama llama3.2-vision
 
 ---
 
-## Ethical Boundaries & Forensic Standards
+## Forensic Standards & Guarantees
 
-`matazero` enforces strict code-level safeguards against surveillance abuse while providing courtroom-grade, verifiable forensic intelligence:
+`matazero` is engineered for courtroom-grade, verifiable image intelligence with strict architectural guarantees:
 
-| ❌ Prohibited (Hardcoded Refusals) | 🛡️ Guaranteed by Design |
+| 🔒 Privacy & Operational Safety | 🛡️ Forensic Standards & Custody |
 | :--- | :--- |
-| **No Facial Recognition** or Biometrics | **100% Offline & Air-Gapped** (Zero telemetry, zero external APIs) |
-| **No Bulk Web Scraping** or Social Media Crawling | **Deterministic Verdicts** (`AUTHENTIC`, `TAMPERED`, `SYNTHETIC`) with confidence ratings |
-| **No Cross-Platform** Identity Profiling | **Cryptographic Audit Log** (SHA-256 hash-chained tamper-proofing) |
-| **No Real-Time** Geolocation Tracking | **Strict Legal Scopes** (HMAC-SHA256 signed authorization tokens) |
-| **No External Database** Lookups | **Verifiable Provenance** for every finding at every extraction tier |
+| **100% Offline & Air-Gapped** (Zero telemetry, zero external APIs) | **Deterministic Verdicts** (`AUTHENTIC`, `TAMPERED`, `SYNTHETIC`) with confidence scoring |
+| **Zero Biometric Surveillance** (No facial recognition or identity tracking) | **Cryptographic Audit Log** (SHA-256 hash-chained tamper-proofing) |
+| **No Bulk Web Scraping** (No automated crawling or social graph tracking) | **Verifiable Provenance** for every finding across all 7 extraction tiers |
+| **No External Database Queries** (Evidence never leaves your machine) | **Strict Legal Scopes** (HMAC-SHA256 signed authorization tokens) |
 
 ---
 
