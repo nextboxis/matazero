@@ -362,16 +362,17 @@ python -m matazero analyze suspect.jpg -a --ollama llama3.2-vision
 
 ---
 
-## Ethical Boundaries
+## Ethical Boundaries & Forensic Standards
 
-`matazero` includes code-level safeguards against surveillance abuse:
+`matazero` enforces strict code-level safeguards against surveillance abuse while providing courtroom-grade, verifiable forensic intelligence:
 
-* ❌ **No Facial Recognition or Biometrics**
-* ❌ **No Bulk Web Scraping or Social Media Crawling**
-* ❌ **No Cross-Platform Identity Tracking**
-* ❌ **No Real-Time Geolocation Tracking**
-* ❌ **No External Hash Database Lookups**
-* 🛡️ **Transparent Authenticity Analysis**: Authenticity assessments (`AUTHENTIC_CAMERA_CAPTURE`, `TAMPERED_TRAILING_PAYLOAD`, `AI_SYNTHETIC_GENERATION`, `UNVERIFIED_METADATA_STRIPPED`) are computed from verifiable structural indicators with mandatory confidence scores and caveats.
+| ❌ Prohibited (Hardcoded Refusals) | 🛡️ Guaranteed by Design |
+| :--- | :--- |
+| **No Facial Recognition** or Biometrics | **100% Offline & Air-Gapped** (Zero telemetry, zero external APIs) |
+| **No Bulk Web Scraping** or Social Media Crawling | **Deterministic Verdicts** (`AUTHENTIC`, `TAMPERED`, `SYNTHETIC`) with confidence ratings |
+| **No Cross-Platform** Identity Profiling | **Cryptographic Audit Log** (SHA-256 hash-chained tamper-proofing) |
+| **No Real-Time** Geolocation Tracking | **Strict Legal Scopes** (HMAC-SHA256 signed authorization tokens) |
+| **No External Database** Lookups | **Verifiable Provenance** for every finding at every extraction tier |
 
 ---
 
