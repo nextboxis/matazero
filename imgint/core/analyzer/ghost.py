@@ -1,10 +1,14 @@
-﻿"""JPEG Ghost and Double Compression Splicing Analyzer."""
+"""JPEG Ghost and Double Compression Splicing Analyzer."""
 
 from __future__ import annotations
 import io
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 import numpy as np
 from PIL import Image
+DEFAULT_GHOST_QUALITIES = [50, 60, 70, 75, 80, 85, 90, 95]
+DEFAULT_MAX_ANALYSIS_DIM = 1024
+SPLICING_VARIANCE_THRESHOLD = 180.0
+GRID_CONTRAST_THRESHOLD = 1.05
 
 
 class JpegGhostDetector:
@@ -17,7 +21,7 @@ class JpegGhostDetector:
         block_size: int = 16,
     ) -> Dict[str, Any]:
         if qualities is None:
-            qualities = [50, 60, 70, 75, 80, 85, 90, 95]
+            qualities = DEFAULT_GHOST_QUALITIES
 
         if isinstance(img_or_bytes, bytes):
             img = Image.open(io.BytesIO(img_or_bytes)).convert("RGB")
@@ -27,7 +31,7 @@ class JpegGhostDetector:
             img = img_or_bytes.convert("RGB")
 
         # Resize if extremely large to prevent OOM
-        max_dim = 1024
+        max_dim = DEFAULT_MAX_ANALYSIS_DIM
         w, h = img.size
         if max(w, h) > max_dim:
             scale = max_dim / float(max(w, h))
@@ -38,6 +42,7 @@ class JpegGhostDetector:
 
         # Calculate error surface across quality factors
         error_surfaces: Dict[int, float] = {}
+        pre_computed_errors: Dict[int, np.ndarray] = {}
 
         for q in qualities:
             buf = io.BytesIO()
@@ -47,6 +52,7 @@ class JpegGhostDetector:
 
             # Mean absolute error
             diff = np.abs(orig_np - recompressed)
+            pre_computed_errors[q] = diff
             mean_err = float(np.mean(diff))
             error_surfaces[q] = mean_err
 
@@ -71,32 +77,27 @@ class JpegGhostDetector:
         gray = np.mean(orig_np, axis=2)
         h_diff = np.abs(gray[1:, :] - gray[:-1, :])
 
-        h_8_energy = np.mean(h_diff[7::8, :]) if h_diff.shape[0] > 8 else 0.0
+        h_8_energy = np.mean(h_diff[7::8, :]) if h_diff.shape[0] >= 8 else 0.0
         h_other_energy = np.mean(h_diff) + 1e-6
-        grid_contrast = float(h_8_energy / h_other_energy)
+        
+        if np.isnan(h_other_energy) or h_other_energy == 0:
+            grid_contrast = 0.0
+        else:
+            grid_contrast = float(h_8_energy / h_other_energy)
 
         # Patch-wise local minimum variance for composite splicing detection
         step = block_size
         patch_best_q = []
-        for y in range(0, height - step, step):
-            for x in range(0, width - step, step):
-                patch_orig = orig_np[y : y + step, x : x + step]
-                p_min_q = 95
-                p_min_val = float("inf")
+        for y in range(0, height - step + 1, step):
+            for x in range(0, width - step + 1, step):
+                patch_errors = {}
                 for q in qualities:
-                    buf = io.BytesIO()
-                    patch_img = Image.fromarray(patch_orig.astype(np.uint8))
-                    patch_img.save(buf, format="JPEG", quality=q)
-                    buf.seek(0)
-                    patch_recomp = np.array(Image.open(buf), dtype=np.float32)
-                    p_err = np.mean(np.abs(patch_orig - patch_recomp))
-                    if p_err < p_min_val:
-                        p_min_val = p_err
-                        p_min_q = q
-                patch_best_q.append(p_min_q)
+                    patch_errors[q] = float(np.mean(pre_computed_errors[q][y : y + step, x : x + step]))
+                best_q = min(patch_errors, key=patch_errors.get)
+                patch_best_q.append(best_q)
 
         q_variance = float(np.var(patch_best_q)) if patch_best_q else 0.0
-        is_spliced = q_variance > 180.0  # Multi-modal quality distribution indicates composite image
+        is_spliced = q_variance > SPLICING_VARIANCE_THRESHOLD  # Multi-modal quality distribution indicates composite image
 
         return {
             "is_double_compressed": is_double_compressed,
@@ -106,5 +107,5 @@ class JpegGhostDetector:
             "quality_variance": round(q_variance, 2),
             "spliced_ghost_detected": is_spliced,
             "dct_8x8_grid_contrast": round(grid_contrast, 3),
-            "grid_aligned": grid_contrast > 1.05,
+            "grid_aligned": grid_contrast > GRID_CONTRAST_THRESHOLD,
         }

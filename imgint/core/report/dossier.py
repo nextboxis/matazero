@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import json
-import base64
+import html
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -20,6 +20,7 @@ class CaseDossierGenerator:
         case_title: str = "Forensic Evidence Triage Dossier",
         output_path: Optional[str | Path] = None,
     ) -> str:
+        """Generate a standalone HTML dossier for a set of analysis records."""
         total_items = len(records)
         authentic_count = 0
         tampered_count = 0
@@ -58,8 +59,8 @@ class CaseDossierGenerator:
             make_f = next((f for f in rec.fields if f.name == "Make"), None)
             model_f = next((f for f in rec.fields if f.name == "Model"), None)
 
-            camera_str = f"{make_f.value if make_f else ''} {model_f.value if model_f else ''}".strip() or "Unknown Camera"
-            timestamp_str = str(time_f.value) if time_f else "No timestamp"
+            camera_str = html.escape(f"{make_f.value if make_f else ''} {model_f.value if model_f else ''}".strip() or "Unknown Camera")
+            timestamp_str = html.escape(str(time_f.value) if time_f else "No timestamp")
 
             lat_val = None
             lon_val = None
@@ -70,7 +71,8 @@ class CaseDossierGenerator:
                 except Exception:
                     pass
 
-            f_name = Path(rec.file_path).name if rec.file_path else "evidence"
+            f_name = html.escape(Path(rec.file_path).name if rec.file_path else "evidence")
+            safe_badge_text = html.escape(badge_text)
 
             if lat_val is not None and lon_val is not None:
                 gps_points.append({
@@ -79,38 +81,39 @@ class CaseDossierGenerator:
                     "lng": lon_val,
                     "camera": camera_str,
                     "timestamp": timestamp_str,
-                    "verdict": badge_text,
+                    "verdict": safe_badge_text,
                 })
 
             # Format finding tags
-            finding_names = [f.name for f in rec.findings[:6]]
+            finding_names = [html.escape(f.name) for f in rec.findings[:6]]
 
             table_rows_data.append({
                 "file_name": f_name,
                 "file_size": f"{rec.file_size / 1024:.1f} KB",
                 "mime_type": rec.mime_type,
-                "sha256": rec.sha256[:12] + "...",
+                "sha256": html.escape(rec.sha256[:12] + "..."),
                 "camera": camera_str,
                 "timestamp": timestamp_str,
                 "has_gps": lat_val is not None,
                 "rating": rating,
                 "badge_class": badge_class,
-                "badge_text": badge_text,
+                "badge_text": safe_badge_text,
                 "confidence": f"{conf * 100:.0f}%",
                 "findings_count": len(rec.findings),
                 "finding_tags": finding_names,
             })
 
         generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        gps_json = json.dumps(gps_points)
+        gps_json = json.dumps(gps_points).replace('</', r'<\/')
         rows_json = json.dumps(table_rows_data)
+        safe_case_title = html.escape(case_title)
 
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{case_title} — matazero</title>
+<title>{safe_case_title} — matazero</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
 :root {{
@@ -166,7 +169,7 @@ footer {{ text-align: center; color: var(--text-secondary); font-size: 12px; mar
   <header>
     <div>
       <div class="logo">🔬 matazero Dossier</div>
-      <div class="subtitle">{case_title} • Generated on {generated_at}</div>
+      <div class="subtitle">{safe_case_title} • Generated on {generated_at}</div>
     </div>
     <div style="text-align: right;">
       <span class="badge badge-authentic">Air-Gapped Forensic Audit</span>

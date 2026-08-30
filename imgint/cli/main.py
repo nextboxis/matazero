@@ -6,7 +6,7 @@ import os
 import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import click
 from rich.console import Console
@@ -15,10 +15,11 @@ from rich.panel import Panel
 from rich.text import Text
 
 from imgint import __version__
+from imgint.cli.commands._utils import resolve_scope, ExitCode
 from imgint.core.evidence.store import EvidenceStore, EvidenceCustodyError
 from imgint.core.governance.audit import AuditLogger, verify_audit_chain
 from imgint.core.governance.scope import AuthorizationScope, ScopeValidationError
-from imgint.core.pipeline import AnalysisPipeline
+from imgint.core.pipeline import AnalysisPipeline, AnalysisRecord
 from imgint.core.report.renderer import ReportRenderer
 from imgint.core.report.manifest import HashManifestGenerator
 from imgint.core.clean.cleaner import MetadataCleaner
@@ -121,7 +122,7 @@ def scope_validate(scope_file: str, secret: Optional[str]) -> None:
         console.print(f"  Scope Hash:  {s.scope_hash}")
     except ScopeValidationError as e:
         err_console.print(f"[red][X] Scope INVALID: {e}[/red]")
-        sys.exit(6)
+        sys.exit(ExitCode.SCOPE_ERROR)
 
 
 # -----------------------------------------------------------------------------
@@ -235,21 +236,7 @@ def analyze(
 ) -> None:
     """Run 7 extraction tiers over evidence files."""
     # Scope resolution
-    auth_scope: Optional[AuthorizationScope] = None
-    if self_audit:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
-    elif scope_path:
-        try:
-            auth_scope = AuthorizationScope.load_from_file(scope_path)
-        except ScopeValidationError as e:
-            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
-            sys.exit(6)
-    else:
-        err_console.print(
-            "[red]Authorization failure (Exit 6): No authorization scope provided.\n"
-            "Provide --scope PATH, set IMGINT_SCOPE, or use --self-audit for personal files.[/red]"
-        )
-        sys.exit(6)
+    auth_scope = resolve_scope(scope_path, self_audit, require_scope=True, err_console=err_console)
 
     # Initialize store and audit log
     evidence_store = EvidenceStore(store_path) if not self_audit else None
@@ -304,7 +291,7 @@ def analyze(
                 if err:
                     if err[0] == "custody":
                         err_console.print(f"[bold red]CRITICAL CUSTODY FAILURE (Exit 7): {err[1]}[/bold red]")
-                        sys.exit(7)
+                        sys.exit(ExitCode.CUSTODY_ERROR)
                     else:
                         err_console.print(f"[red]{err[1]}[/red]")
                         has_error = True
@@ -318,7 +305,7 @@ def analyze(
             if err:
                 if err[0] == "custody":
                     err_console.print(f"[bold red]CRITICAL CUSTODY FAILURE (Exit 7): {err[1]}[/bold red]")
-                    sys.exit(7)
+                    sys.exit(ExitCode.CUSTODY_ERROR)
                 else:
                     err_console.print(f"[red]{err[1]}[/red]")
                     has_error = True
@@ -401,16 +388,7 @@ def locate(
 ) -> None:
     """Forensic Geolocation, Reverse Geocoding, Solar Chronolocation, and Trajectory Intelligence."""
     # Scope resolution
-    if self_audit:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
-    elif scope_path:
-        try:
-            auth_scope = AuthorizationScope.load_from_file(scope_path)
-        except ScopeValidationError as e:
-            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
-            sys.exit(6)
-    else:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
+    auth_scope = resolve_scope(scope_path, self_audit, require_scope=False, err_console=err_console)
 
     resolved_targets = _expand_file_targets(targets, recursive=recursive, glob_pattern=glob_pattern)
     if not resolved_targets:
@@ -791,16 +769,7 @@ def extract(
 ) -> None:
     """Extract embedded thumbnails, previews, payloads, metadata streams, or -x -y image crops."""
     # Scope resolution
-    if self_audit:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
-    elif scope_path:
-        try:
-            auth_scope = AuthorizationScope.load_from_file(scope_path)
-        except ScopeValidationError as e:
-            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
-            sys.exit(6)
-    else:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
+    auth_scope = resolve_scope(scope_path, self_audit, require_scope=False, err_console=err_console)
 
     # Default to extract_all if no specific extract flag is selected
     if not (extract_all or thumbnail or preview or payload or metadata or (pos_x is not None and pos_y is not None)):
@@ -866,7 +835,7 @@ def audit_verify(audit_file: str) -> None:
         console.print(f"[green][OK] {message}[/green]")
     else:
         err_console.print(f"[bold red][X] AUDIT CHAIN COMPROMISED (Exit 7): {message}[/bold red]")
-        sys.exit(7)
+        sys.exit(ExitCode.CUSTODY_ERROR)
 
 
 # -----------------------------------------------------------------------------
@@ -998,16 +967,7 @@ def diff(
 ) -> None:
     """Forensic comparison between two images (structure, metadata, DQT, and pixels)."""
     # Scope resolution
-    if self_audit:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
-    elif scope_path:
-        try:
-            auth_scope = AuthorizationScope.load_from_file(scope_path)
-        except ScopeValidationError as e:
-            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
-            sys.exit(6)
-    else:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
+    auth_scope = resolve_scope(scope_path, self_audit, require_scope=False, err_console=err_console)
 
     pipeline = AnalysisPipeline(scope=auth_scope, selected_tiers={1, 2, 3, 4, 5, 6, 7})
     result = ForensicComparator.compare(target_a, target_b, pipeline=pipeline)
@@ -1047,16 +1007,7 @@ def stego(
 ) -> None:
     """Deep Steganography, Multi-Channel Bitplane Slicing, and Chi-Square PoV Inspection."""
     # Scope resolution
-    if self_audit:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
-    elif scope_path:
-        try:
-            auth_scope = AuthorizationScope.load_from_file(scope_path)
-        except ScopeValidationError as e:
-            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
-            sys.exit(6)
-    else:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
+    auth_scope = resolve_scope(scope_path, self_audit, require_scope=False, err_console=err_console)
 
     result = StegoInspector.inspect(target, save_bitplanes_dir=save_bp_dir)
 
@@ -1097,16 +1048,7 @@ def timeline(
 ) -> None:
     """Reconstruct multi-asset chronological timelines and estimate camera clock drift."""
     # Scope resolution
-    if self_audit:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
-    elif scope_path:
-        try:
-            auth_scope = AuthorizationScope.load_from_file(scope_path)
-        except ScopeValidationError as e:
-            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
-            sys.exit(6)
-    else:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
+    auth_scope = resolve_scope(scope_path, self_audit, require_scope=False, err_console=err_console)
 
     resolved_targets = _expand_file_targets(targets, recursive=recursive, glob_pattern=glob_pattern)
     if not resolved_targets:
@@ -1187,16 +1129,7 @@ def cluster(
 ) -> None:
     """Group evidence files by camera fleet, DQT tables, GPS proximity, or visual similarity."""
     # Scope resolution
-    if self_audit:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
-    elif scope_path:
-        try:
-            auth_scope = AuthorizationScope.load_from_file(scope_path)
-        except ScopeValidationError as e:
-            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
-            sys.exit(6)
-    else:
-        auth_scope = AuthorizationScope.create_self_audit_scope()
+    auth_scope = resolve_scope(scope_path, self_audit, require_scope=False, err_console=err_console)
 
     resolved_targets = _expand_file_targets(targets, recursive=recursive, glob_pattern=glob_pattern)
     if not resolved_targets:
@@ -1245,7 +1178,7 @@ def export_sqlite(
     self_audit: bool,
 ) -> None:
     """Index analysis records into a structured, queryable SQLite relational database."""
-    auth_scope = AuthorizationScope.create_self_audit_scope() if self_audit or not scope_path else AuthorizationScope.load_from_file(scope_path)
+    auth_scope = resolve_scope(scope_path, self_audit, require_scope=False, err_console=err_console)
     resolved_targets = _expand_file_targets(targets, recursive=recursive, glob_pattern=glob_pattern)
     if not resolved_targets:
         err_console.print("[yellow]No matching image files to export.[/yellow]")
@@ -1273,7 +1206,7 @@ def export_stix(
     self_audit: bool,
 ) -> None:
     """Generate STIX 2.1 Threat Intelligence Bundle with Cyber Observable and Indicator Objects."""
-    auth_scope = AuthorizationScope.create_self_audit_scope() if self_audit or not scope_path else AuthorizationScope.load_from_file(scope_path)
+    auth_scope = resolve_scope(scope_path, self_audit, require_scope=False, err_console=err_console)
     resolved_targets = _expand_file_targets(targets, recursive=recursive, glob_pattern=glob_pattern)
     if not resolved_targets:
         err_console.print("[yellow]No matching image files to export.[/yellow]")
@@ -1357,6 +1290,7 @@ def skill_info(skill_id: str) -> None:
     panel_content.append(f"{'Required' if skill.requires_decode else 'No'}\n", style="white")
     panel_content.append(f"\nDescription:\n", style="bold dim")
     panel_content.append(f"{skill.description or 'No description provided.'}\n", style="white")
+    console.print(Panel(panel_content, title=f"Skill: {skill.name}", border_style="cyan"))
 
 # -----------------------------------------------------------------------------
 # Subcommand: ask (Interactive Local AI Visual Interrogation)
@@ -1473,13 +1407,7 @@ def scan(
 ) -> None:
     """Smart 1-command evidence auto-triage with live progress and HTML dossier."""
     # Scope resolution
-    auth_scope = AuthorizationScope.create_self_audit_scope() if self_audit or not scope_path else None
-    if not auth_scope and scope_path:
-        try:
-            auth_scope = AuthorizationScope.load_from_file(scope_path)
-        except ScopeValidationError as e:
-            err_console.print(f"[bold red]Authorization failure (Exit 6): {e}[/bold red]")
-            sys.exit(6)
+    auth_scope = resolve_scope(scope_path, self_audit, require_scope=False, err_console=err_console)
 
     pipeline = AnalysisPipeline(scope=auth_scope)
 

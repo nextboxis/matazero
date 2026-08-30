@@ -1,7 +1,8 @@
-﻿"""Ollama Vision Analyzer for Tier 7 Pipeline Integration."""
+"""Ollama Vision Analyzer for Tier 7 Pipeline Integration."""
 
 from __future__ import annotations
 import json
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from imgint.core.ai.ollama import OllamaClient
@@ -18,6 +19,16 @@ class OllamaVisionAnalyzer:
     def analyze(
         cls, ctx: AnalysisContext, model_name: Optional[str] = None
     ) -> Tuple[List[Finding], List[Diagnostic]]:
+        """
+        Run local Ollama vision inspection and generate structured Tier 7 findings.
+
+        Args:
+            ctx: The analysis context containing the image and metadata.
+            model_name: Optional specific vision model name to use.
+            
+        Returns:
+            A tuple of (findings, diagnostics).
+        """
         findings: List[Finding] = []
         diagnostics: List[Diagnostic] = []
 
@@ -62,10 +73,28 @@ class OllamaVisionAnalyzer:
             return findings, diagnostics
 
         response_text = res.get("response", "").strip()
+        
+        # Strip markdown code fences if present
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        elif response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+
         try:
             parsed_data = json.loads(response_text)
         except Exception:
-            parsed_data = {"raw_response": response_text}
+            # Fallback JSON extraction
+            match = re.search(r'(\{.*\})', response_text, re.DOTALL)
+            if match:
+                try:
+                    parsed_data = json.loads(match.group(1))
+                except Exception:
+                    parsed_data = {"raw_response": response_text}
+            else:
+                parsed_data = {"raw_response": response_text}
 
         findings.append(
             Finding(

@@ -1,4 +1,4 @@
-﻿"""Ollama local vision model client using standard library HTTP."""
+"""Ollama local vision model client using standard library HTTP."""
 
 from __future__ import annotations
 import base64
@@ -6,7 +6,7 @@ import json
 import urllib.request
 import urllib.error
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 
 KNOWN_VISION_MODELS = (
@@ -20,11 +20,15 @@ KNOWN_VISION_MODELS = (
     "vision",
 )
 
+DEFAULT_HOST = "http://localhost:11434"
+HEALTH_CHECK_TIMEOUT = 3
+TAGS_TIMEOUT = 5
+DEFAULT_VISION_MODEL = "llama3.2-vision"
 
 class OllamaClient:
     """Zero-dependency local HTTP client for communicating with Ollama on localhost."""
 
-    def __init__(self, host: str = "http://localhost:11434", timeout: int = 120) -> None:
+    def __init__(self, host: str = DEFAULT_HOST, timeout: int = 120) -> None:
         self.host = host.rstrip("/")
         self.timeout = timeout
 
@@ -32,7 +36,7 @@ class OllamaClient:
         """Checks if the local Ollama daemon is running."""
         try:
             req = urllib.request.Request(f"{self.host}/api/tags", method="GET")
-            with urllib.request.urlopen(req, timeout=3) as resp:
+            with urllib.request.urlopen(req, timeout=HEALTH_CHECK_TIMEOUT) as resp:
                 return resp.status == 200
         except Exception:
             return False
@@ -41,7 +45,7 @@ class OllamaClient:
         """Retrieves list of all locally installed models from Ollama."""
         try:
             req = urllib.request.Request(f"{self.host}/api/tags", method="GET")
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=TAGS_TIMEOUT) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data.get("models", [])
         except Exception:
@@ -50,7 +54,7 @@ class OllamaClient:
     def list_vision_models(self) -> List[str]:
         """Filters installed models for vision-capable models."""
         models = self.list_models()
-        vision_models = []
+        vision_models: List[str] = []
         for m in models:
             name = m.get("name", "").lower()
             if any(vk in name for vk in KNOWN_VISION_MODELS):
@@ -66,7 +70,7 @@ class OllamaClient:
         all_models = self.list_models()
         if all_models:
             return all_models[0].get("name")
-        return "llama3.2-vision"
+        return DEFAULT_VISION_MODEL
 
     def generate(
         self,
@@ -80,7 +84,14 @@ class OllamaClient:
 
         if image_path_or_bytes is not None:
             if isinstance(image_path_or_bytes, (str, Path)):
-                raw_img = Path(image_path_or_bytes).read_bytes()
+                try:
+                    raw_img = Path(image_path_or_bytes).read_bytes()
+                except Exception as e:
+                    return {
+                        "error": f"Failed to read image file: {e}",
+                        "response": "",
+                        "done": False,
+                    }
             else:
                 raw_img = image_path_or_bytes
             b64_str = base64.b64encode(raw_img).decode("ascii")
@@ -108,6 +119,16 @@ class OllamaClient:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 res_json = json.loads(resp.read().decode("utf-8"))
                 return res_json
+        except urllib.error.HTTPError as e:
+            try:
+                error_body = e.read().decode("utf-8")
+            except Exception:
+                error_body = str(e)
+            return {
+                "error": f"Ollama HTTP error {e.code}: {error_body}",
+                "response": "",
+                "done": False,
+            }
         except urllib.error.URLError as e:
             return {
                 "error": f"Failed to communicate with Ollama at {self.host}: {e}. Ensure 'ollama serve' is running.",

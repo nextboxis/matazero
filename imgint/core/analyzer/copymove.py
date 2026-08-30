@@ -1,4 +1,4 @@
-﻿"""Copy-Move and Clone-Stamp Forgery Detector."""
+"""Copy-Move and Clone-Stamp Forgery Detector."""
 
 from __future__ import annotations
 import io
@@ -110,6 +110,8 @@ class CopyMoveDetector:
                 diff = np.abs(f1 - f2) / (np.abs(f1) + np.abs(f2) + 1e-6)
                 if np.max(diff) < (1.0 - similarity_threshold):
                     # Quantize shift vector to 16px bins
+                    if dx < 0 or (dx == 0 and dy < 0):
+                        dx, dy = -dx, -dy
                     shift_key = (round(dx / 16) * 16, round(dy / 16) * 16)
                     shift_vector_counts[shift_key] = shift_vector_counts.get(shift_key, 0) + 1
 

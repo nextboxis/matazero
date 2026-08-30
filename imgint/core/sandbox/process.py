@@ -21,7 +21,7 @@ class SandboxRunner:
     @classmethod
     def run_decode_tasks(
         cls,
-        file_path: str | Path,
+        file_path: Optional[str | Path] = None,
         tasks: Optional[List[str]] = None,
         extra_params: Optional[Dict[str, Any]] = None,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
@@ -41,7 +41,6 @@ class SandboxRunner:
 
         # Ensure child process can always locate imgint package
         repo_root = str(Path(__file__).parent.parent.parent.parent.resolve())
-        env = dict(sys.modules.get("os", {}).environ if hasattr(sys, "modules") else {})
         import os
         env = os.environ.copy()
         existing_pythonpath = env.get("PYTHONPATH", "")
@@ -70,6 +69,7 @@ class SandboxRunner:
             return result
         except subprocess.TimeoutExpired:
             proc.kill()
+            proc.communicate()
             return {"success": False, "error": f"Child decode timed out after {timeout}s"}
         except Exception as e:
             return {"success": False, "error": f"Sandbox execution exception: {e}"}

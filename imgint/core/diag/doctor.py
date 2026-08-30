@@ -7,15 +7,19 @@ import platform
 import shutil
 import importlib
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
 
 from imgint.core.ai.ollama import OllamaClient
 from imgint.core.sandbox.process import SandboxRunner
+
+MIN_PYTHON_VERSION = (3, 10)
+SANDBOX_PROBE_SIZE = (8, 8)
+DEFAULT_VAULT_PATH = "./evidence_store"
+MIN_VAULT_FREE_GB = 0.5
 
 
 class DiagnosticRunner:
@@ -31,7 +35,7 @@ class DiagnosticRunner:
 
         # 1. Python Environment
         py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-        py_ok = sys.version_info >= (3, 10)
+        py_ok = sys.version_info >= MIN_PYTHON_VERSION
         arch = platform.machine()
         os_info = f"{platform.system()} {platform.release()}"
         results["checks"].append({
@@ -39,7 +43,7 @@ class DiagnosticRunner:
             "name": "Python Environment",
             "status": py_ok,
             "details": f"Python {py_ver} ({platform.architecture()[0]}, {arch}) on {os_info}",
-            "hint": "Python 3.10+ required" if not py_ok else None,
+            "hint": f"Python {MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}+ required" if not py_ok else None,
         })
         if not py_ok:
             results["all_passed"] = False
@@ -78,7 +82,7 @@ class DiagnosticRunner:
             import io
             import base64
             test_buf = io.BytesIO()
-            Image.new("RGB", (8, 8), color="blue").save(test_buf, "PNG")
+            Image.new("RGB", SANDBOX_PROBE_SIZE, color="blue").save(test_buf, "PNG")
             raw_bytes_b64 = base64.b64encode(test_buf.getvalue()).decode("ascii")
 
             worker_res = SandboxRunner.run_decode_tasks(None, raw_bytes=raw_bytes_b64, tasks=["dimensions"])
@@ -123,15 +127,18 @@ class DiagnosticRunner:
         })
 
         # 5. Evidence Vault Storage & Permissions
-        vault_path = Path("./evidence_store").resolve()
+        vault_path = Path(DEFAULT_VAULT_PATH).resolve()
         try:
             vault_path.mkdir(parents=True, exist_ok=True)
             test_file = vault_path / ".doctor_perm_test"
-            test_file.write_text("test")
-            test_file.unlink()
+            try:
+                test_file.write_text("test")
+            finally:
+                if test_file.exists():
+                    test_file.unlink()
             total, used, free = shutil.disk_usage(str(vault_path))
             free_gb = free / (1024 ** 3)
-            storage_ok = free_gb >= 0.5  # At least 500MB free
+            storage_ok = free_gb >= MIN_VAULT_FREE_GB
             storage_details = f"Writable at {vault_path} ({free_gb:.1f} GB free space)"
         except Exception as e:
             storage_ok = False
@@ -148,16 +155,17 @@ class DiagnosticRunner:
             results["all_passed"] = False
 
         # 6. Man Page & CLI Access
-        man_path = Path("/usr/local/share/man/man1/matazero.1")
-        has_man = man_path.exists() or Path("docs/man/matazero.1").exists()
-        results["checks"].append({
-            "category": "Documentation",
-            "name": "UNIX Manual Page (matazero.1)",
-            "status": has_man,
-            "details": "Installed in system manpath" if man_path.exists() else "Available in docs/man/matazero.1",
-            "hint": "Run ./install.sh to install global man page" if not man_path.exists() else None,
-            "optional": True,
-        })
+        if platform.system() != "Windows":
+            man_path = Path("/usr/local/share/man/man1/matazero.1")
+            has_man = man_path.exists() or Path("docs/man/matazero.1").exists()
+            results["checks"].append({
+                "category": "Documentation",
+                "name": "UNIX Manual Page (matazero.1)",
+                "status": has_man,
+                "details": "Installed in system manpath" if man_path.exists() else "Available in docs/man/matazero.1",
+                "hint": "Run ./install.sh to install global man page" if not man_path.exists() else None,
+                "optional": True,
+            })
 
         # Render Rich UI Output
         cls._render_ui(results, console)

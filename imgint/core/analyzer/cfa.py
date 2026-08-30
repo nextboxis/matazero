@@ -1,10 +1,13 @@
-﻿"""Color Filter Array (CFA) Bayer Demosaicing Inconsistency Analyzer."""
+"""Color Filter Array (CFA) Bayer Demosaicing Inconsistency Analyzer."""
 
 from __future__ import annotations
 import io
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict
 import numpy as np
 from PIL import Image
+CFA_ANALYSIS_BLOCK_SIZE = 512
+MIN_CFA_DIMENSION = 64
+BAYER_PERIODICITY_THRESHOLD = 0.20
 
 
 class CfaDemosaicAnalyzer:
@@ -19,8 +22,8 @@ class CfaDemosaicAnalyzer:
         else:
             img = img_or_bytes.convert("RGB")
 
-        # Resize to standard analysis block (512x512) for reliable frequency analysis
-        max_dim = 512
+        # Resize to standard analysis block for reliable frequency analysis
+        max_dim = CFA_ANALYSIS_BLOCK_SIZE
         w, h = img.size
         if w != max_dim or h != max_dim:
             # Crop center region to preserve raw pixel relationships without resampling distortion
@@ -32,7 +35,7 @@ class CfaDemosaicAnalyzer:
             img_crop = img
 
         arr = np.array(img_crop, dtype=np.float32)
-        if arr.shape[0] < 64 or arr.shape[1] < 64:
+        if arr.shape[0] < MIN_CFA_DIMENSION or arr.shape[1] < MIN_CFA_DIMENSION:
             return {
                 "bayer_periodicity_score": 0.0,
                 "cfa_pattern_detected": "UNKNOWN_TOO_SMALL",
@@ -58,14 +61,9 @@ class CfaDemosaicAnalyzer:
 
         # In Bayer demosaicing, peak energy spikes appear at (0, pi), (pi, 0), and (pi, pi)
         # in the normalized frequency spectrum
-        cy, cx = fft_shift.shape[0] // 2, fft_shift.shape[1] // 2
-        nyquist_y = 0  # relative to center
-        nyquist_x = 0
 
         # Sample high-frequency quadrant energy vs background noise floor
         total_energy = np.sum(fft_shift) + 1e-6
-        center_mask = np.zeros_like(fft_shift, dtype=bool)
-        center_mask[cy - 10 : cy + 10, cx - 10 : cx + 10] = True
 
         hf_corners = np.sum(fft_shift[0:15, 0:15]) + np.sum(fft_shift[-15:, -15:])
         hf_corners += np.sum(fft_shift[0:15, -15:]) + np.sum(fft_shift[-15:, 0:15])
@@ -80,12 +78,13 @@ class CfaDemosaicAnalyzer:
         r_neighbors = (r_pad[:-2, 1:-1] + r_pad[2:, 1:-1] + r_pad[1:-1, :-2] + r_pad[1:-1, 2:]) * 0.25
         r_residual = R - r_neighbors
 
-        rg_corr = float(np.corrcoef(g_residual.flatten(), r_residual.flatten())[0, 1])
+        with np.errstate(divide='ignore', invalid='ignore'):
+            rg_corr = float(np.corrcoef(g_residual.flatten(), r_residual.flatten())[0, 1])
         if np.isnan(rg_corr):
             rg_corr = 0.0
 
         # Physical cameras typically exhibit high periodicity (> 0.25) and strong R-G residual correlation
-        is_hardware_consistent = periodicity_score >= 0.20 and abs(rg_corr) > 0.15
+        is_hardware_consistent = periodicity_score >= BAYER_PERIODICITY_THRESHOLD and abs(rg_corr) > 0.15
 
         pattern = "RGGB_BAYER" if is_hardware_consistent else "NON_BAYER_OR_SYNTHETIC"
 
