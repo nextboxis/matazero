@@ -277,6 +277,16 @@ python -m matazero audit verify ./audit.jsonl
 
 # 18. Losslessly strip metadata while preserving raw pixel streams
 python -m matazero clean photo.jpg -o cleaned.jpg -c
+
+# 19. Discover and list locally installed Ollama vision models
+python -m matazero model list
+
+# 20. Interrogate an evidence photo using your local Ollama vision model (100% offline)
+python -m matazero ask crime_scene.jpg "What make, model, and color is the vehicle in the background?"
+python -m matazero ask suspect.jpg "Are there any physical or lighting inconsistencies suggesting synthetic generation?"
+
+# 21. Run Tier 7 AI visual examination integrated directly into full forensic analysis
+python -m matazero analyze suspect.jpg -a --ollama llama3.2-vision
 ```
 
 ---
@@ -299,7 +309,13 @@ python -m matazero clean photo.jpg -o cleaned.jpg -c
 | `analyze` | | `--glob` | Filter files by pattern (e.g. `*.jpg`, `**/*.png`, `*.pptx`) |
 | `analyze` | | `--filter` | Filter records (e.g. `has_gps`, `has_payload`, `authentic=false`) |
 | `analyze` | | `--select-fields`| Comma-separated metadata fields to retain |
+| `analyze` | | `--ollama` | Run local Ollama vision model inspection in Tier 7 |
 | `analyze` | `-j` | `--jobs` | Number of parallel worker threads (default: 1) |
+| `ask` | `-m` | `--model` | Local Ollama vision model (e.g. `llama3.2-vision`, `moondream`) |
+| `ask` | | `--host` | Ollama server host URL (default: `http://localhost:11434`) |
+| `ask` | `-f` | `--format` | Output format: `table`, `json` |
+| `model list` | | `--host` | Ollama server host URL (default: `http://localhost:11434`) |
+| `model list` | `-f` | `--format` | Output format: `table`, `json` |
 | `locate` | `-o` | `--out` | Write geolocation output to specified file |
 | `locate` | `-f` | `--format` | Output format: `table`, `report`, `json`, `geojson`, `html`, `gpx` |
 | `locate` | `-n` | `--allow-network` | Enable online reverse geocoding via OpenStreetMap |

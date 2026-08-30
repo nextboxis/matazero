@@ -40,6 +40,7 @@ from imgint.core.motion import MotionPhotoDetector, MotionPhotoCarver, MotionPho
 from imgint.core.cluster import ClusterEngine, ClusterRenderer
 from imgint.core.export import SqliteExporter, StixExporter
 from imgint.core.skill import SkillRegistry
+from imgint.core.ai import OllamaClient, OllamaRenderer
 import concurrent.futures
 
 try:
@@ -202,6 +203,7 @@ def _apply_field_selection(rec, select_fields: Optional[str]) -> None:
 @click.option("--glob", "glob_pattern", default=None, help="Glob pattern to filter files (e.g. '*.jpg')")
 @click.option("--filter", "filter_expr", default=None, help="Filter records (e.g. 'has_gps', 'has_payload', 'authentic=false', 'tier=5')")
 @click.option("--select-fields", default=None, help="Comma-separated list of metadata fields to include (e.g. 'Make,Model,GPSInfo')")
+@click.option("--ollama", "ollama_model", default=None, help="Enable local Ollama vision inspection in Tier 7 with specified model (e.g. llama3.2-vision, moondream)")
 @click.option("-j", "--jobs", default=1, type=int, help="Number of concurrent worker threads (default: 1)")
 @click.option("-o", "--out", "out_file", default=None, type=click.Path(), help="Write output to file instead of stdout")
 def analyze(
@@ -222,6 +224,7 @@ def analyze(
     glob_pattern: Optional[str],
     filter_expr: Optional[str],
     select_fields: Optional[str],
+    ollama_model: Optional[str],
     jobs: int,
     out_file: Optional[str],
 ) -> None:
@@ -261,6 +264,7 @@ def analyze(
         allow_network=allow_network,
         enable_ela=ela,
         selected_tiers=tier_set,
+        ollama_model=ollama_model,
     )
 
     resolved_targets = _expand_file_targets(targets, recursive=recursive, glob_pattern=glob_pattern)
@@ -1349,7 +1353,90 @@ def skill_info(skill_id: str) -> None:
     panel_content.append(f"\nDescription:\n", style="bold dim")
     panel_content.append(f"{skill.description or 'No description provided.'}\n", style="white")
 
-    console.print(Panel(panel_content, title="[bold]Forensic Skill Details[/bold]", border_style="cyan"))
+# -----------------------------------------------------------------------------
+# Subcommand: ask (Interactive Local AI Visual Interrogation)
+# -----------------------------------------------------------------------------
+@cli.command("ask")
+@click.argument("target", type=click.Path(exists=True))
+@click.argument("question")
+@click.option("-m", "--model", "model_name", default=None, help="Local Ollama vision model (default: auto-detected, e.g. llama3.2-vision, moondream)")
+@click.option("--host", default="http://localhost:11434", help="Ollama server host (default: http://localhost:11434)")
+@click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "json"]), default="table", help="Output format")
+def ask(
+    target: str,
+    question: str,
+    model_name: Optional[str],
+    host: str,
+    out_fmt: str,
+) -> None:
+    """Interrogate an evidence image using your local Ollama vision model."""
+    client = OllamaClient(host=host)
+    if not client.is_available():
+        err_console.print(
+            f"[bold red][X] Cannot connect to Ollama at {host}[/bold red]\n"
+            "[dim]Start the local Ollama daemon by running: [bold green]ollama serve[/bold green][/dim]"
+        )
+        sys.exit(1)
+
+    selected_model = model_name or client.get_default_vision_model()
+    if not selected_model:
+        err_console.print(
+            "[bold red][X] No vision models found in local Ollama.[/bold red]\n"
+            "[dim]Pull a vision model with: [bold cyan]ollama pull llama3.2-vision[/bold cyan] or [bold cyan]ollama pull moondream[/bold cyan][/dim]"
+        )
+        sys.exit(1)
+
+    with console.status(f"[cyan]Analyzing image with {selected_model}...[/cyan]"):
+        res = client.generate(
+            model=selected_model,
+            prompt=question,
+            image_path_or_bytes=target,
+        )
+
+    if res.get("error"):
+        err_console.print(f"[bold red]Ollama error:[/bold red] {res['error']}")
+        sys.exit(1)
+
+    resp_text = res.get("response", "").strip()
+
+    if out_fmt == "json":
+        print(json.dumps({
+            "target": str(Path(target).resolve()),
+            "model": selected_model,
+            "question": question,
+            "response": resp_text,
+        }, indent=2))
+    else:
+        OllamaRenderer.render_ask_response(target, question, selected_model, resp_text, console)
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: model (Local Model Discovery & Management)
+# -----------------------------------------------------------------------------
+@cli.group("model")
+def model_group() -> None:
+    """Manage and inspect local vision models available in Ollama."""
+    pass
+
+
+@model_group.command("list")
+@click.option("--host", default="http://localhost:11434", help="Ollama server host")
+@click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "json"]), default="table", help="Output format")
+def model_list(host: str, out_fmt: str) -> None:
+    """Discover and list installed models in local Ollama instance."""
+    client = OllamaClient(host=host)
+    is_online = client.is_available()
+    models = client.list_models() if is_online else []
+
+    if out_fmt == "json":
+        print(json.dumps({
+            "ollama_online": is_online,
+            "host": host,
+            "model_count": len(models),
+            "models": models,
+        }, indent=2))
+    else:
+        OllamaRenderer.render_models_table(models, is_online, console)
 
 
 # -----------------------------------------------------------------------------

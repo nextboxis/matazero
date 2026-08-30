@@ -40,6 +40,7 @@ from imgint.core.event import (
     VerdictEvaluatedEvent,
 )
 from imgint.core.skill import SkillRegistry
+from imgint.core.ai import OllamaVisionAnalyzer
 
 
 class AnalysisPipeline:
@@ -54,6 +55,7 @@ class AnalysisPipeline:
         allow_network: bool = False,
         enable_ela: bool = False,
         selected_tiers: Optional[Set[int]] = None,
+        ollama_model: Optional[str] = None,
     ):
         self.scope = scope
         self.audit_logger = audit_logger
@@ -62,6 +64,7 @@ class AnalysisPipeline:
         self.allow_network = allow_network
         self.enable_ela = enable_ela
         self.selected_tiers = selected_tiers or {1, 2, 3, 4, 5, 6, 7}
+        self.ollama_model = ollama_model
 
         self.container_registry = create_default_container_registry()
         self.standard_registry = create_default_standard_registry()
@@ -316,6 +319,20 @@ class AnalysisPipeline:
                             message=f"Skill {skill.id} failed: {e}",
                             source=skill.id,
                         )
+
+        # Tier 7: Optional Ollama Local Vision Inspection
+        if 7 in self.selected_tiers and self.ollama_model:
+            try:
+                ai_findings, ai_diagnostics = OllamaVisionAnalyzer.analyze(ctx, self.ollama_model)
+                for f in ai_findings:
+                    record.add_finding(f)
+                record.diagnostics.extend(ai_diagnostics)
+            except Exception as e:
+                record.add_diagnostic(
+                    level="warning",
+                    message=f"Ollama vision analysis failed: {e}",
+                    source="ollama_vision_analyzer",
+                )
 
         # Update data stream hash on record
         for f in record.findings:
