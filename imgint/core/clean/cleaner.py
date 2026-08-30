@@ -28,6 +28,8 @@ class MetadataCleaner:
             cleaned = cls._clean_jpeg(data)
         elif detected.format_name == "PNG":
             cleaned = cls._clean_png(data)
+        elif detected.format_name in ("WEBP", "RIFF"):
+            cleaned = cls._clean_webp(data)
         else:
             raise ValueError(f"Format {detected.format_name} not supported for metadata cleaning")
 
@@ -122,3 +124,39 @@ class MetadataCleaner:
                 break
 
         return bytes(out)
+
+    @classmethod
+    def _clean_webp(cls, data: bytes) -> bytes:
+        """Strips EXIF, XMP, and ICCP metadata chunks from WebP/RIFF containers."""
+        if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WEBP":
+            return data
+
+        out_chunks = bytearray()
+        offset = 12
+        size = len(data)
+        METADATA_CHUNKS = {b"EXIF", b"XMP ", b"ICCP"}
+
+        while offset + 8 <= size:
+            chunk_fourcc = data[offset : offset + 4]
+            chunk_len = struct.unpack("<I", data[offset + 4 : offset + 8])[0]
+            # WebP chunks are padded to even bytes
+            padded_len = chunk_len + (chunk_len % 2)
+            total_len = 8 + padded_len
+
+            if offset + total_len > size:
+                # Include remaining payload if last chunk is truncated
+                if chunk_fourcc not in METADATA_CHUNKS:
+                    out_chunks.extend(data[offset:])
+                break
+
+            if chunk_fourcc not in METADATA_CHUNKS:
+                out_chunks.extend(data[offset : offset + total_len])
+
+            offset += total_len
+
+        total_riff_size = 4 + len(out_chunks)
+        result = bytearray(b"RIFF")
+        result.extend(struct.pack("<I", total_riff_size))
+        result.extend(b"WEBP")
+        result.extend(out_chunks)
+        return bytes(result)

@@ -94,6 +94,8 @@ class ExifParser(BlockParser):
         diagnostics: List[Diagnostic] = []
 
         data = block.raw_bytes
+        if data.startswith(b"Exif\x00\x00"):
+            data = data[6:]
         size = len(data)
         if size < 8:
             diagnostics.append(
@@ -122,8 +124,11 @@ class ExifParser(BlockParser):
         first_ifd_offset = struct.unpack(f"{endian}I", data[4:8])[0]
 
         visited_offsets = set()
+        max_ifd_limit = 50
 
-        def parse_ifd(ifd_offset: int, ifd_name: str) -> None:
+        def parse_ifd(ifd_offset: int, ifd_name: str, depth: int = 0) -> None:
+            if depth > 10 or len(visited_offsets) >= max_ifd_limit:
+                return
             if ifd_offset in visited_offsets or ifd_offset <= 0 or ifd_offset + 2 > size:
                 return
             visited_offsets.add(ifd_offset)
@@ -193,17 +198,20 @@ class ExifParser(BlockParser):
                             ),
                         )
                     )
+                    # Extract decoded MakerNote sub-fields if recognized
+                    decoded_fields = self._parse_makernote(data, maker_offset, maker_len, endian, block.offset)
+                    fields.extend(decoded_fields)
                     continue
 
                 # Recurse into sub-IFDs
                 if tag_id == 0x8769:  # ExifOffset
-                    parse_ifd(val_or_offset, "ExifSubIFD")
+                    parse_ifd(val_or_offset, "ExifSubIFD", depth + 1)
                     continue
                 elif tag_id == 0x8825:  # GPSInfo
-                    parse_ifd(val_or_offset, "GPSInfo")
+                    parse_ifd(val_or_offset, "GPSInfo", depth + 1)
                     continue
                 elif tag_id == 0xA005:  # InteropOffset
-                    parse_ifd(val_or_offset, "InteropIFD")
+                    parse_ifd(val_or_offset, "InteropIFD", depth + 1)
                     continue
 
                 # Value extraction per type
@@ -247,7 +255,7 @@ class ExifParser(BlockParser):
             if curr + 4 <= size:
                 next_ifd = struct.unpack(f"{endian}I", data[curr : curr + 4])[0]
                 if next_ifd > 0 and next_ifd < size:
-                    parse_ifd(next_ifd, "IFD1")
+                    parse_ifd(next_ifd, "IFD1", depth + 1)
 
         parse_ifd(first_ifd_offset, "IFD0")
         return fields, findings, diagnostics
@@ -270,7 +278,10 @@ class ExifParser(BlockParser):
 
         elif field_type == 3:  # SHORT
             if count == 1:
-                return (val_or_offset & 0xFFFF) if endian == "<" else (val_or_offset >> 16), "SHORT"
+                if endian == ">":
+                    s_val = (val_or_offset >> 16) if (val_or_offset >> 16) != 0 else (val_or_offset & 0xFFFF)
+                    return s_val, "SHORT"
+                return (val_or_offset & 0xFFFF), "SHORT"
             else:
                 vals = []
                 off = val_or_offset
@@ -319,3 +330,106 @@ class ExifParser(BlockParser):
             return f"<Undefined blob: {count} bytes>", "UNDEFINED"
 
         return val_or_offset, f"TYPE_{field_type}"
+
+    def _parse_makernote(
+        self, data: bytes, maker_offset: int, maker_len: int, parent_endian: str, block_abs_offset: int
+    ) -> List[Field]:
+        if maker_offset + maker_len > len(data):
+            return []
+        raw_blob = data[maker_offset : maker_offset + maker_len]
+        if len(raw_blob) < 8:
+            return []
+
+        fields: List[Field] = []
+
+        # 1. Nikon 2/3 (Starts with b"Nikon\x00\x02" or b"Nikon\x00\x01")
+        if raw_blob.startswith(b"Nikon\x00\x02") or raw_blob.startswith(b"Nikon\x00\x01"):
+            hdr_len = 10 if raw_blob.startswith(b"Nikon\x00\x02") else 8
+            sub_data = raw_blob[hdr_len:]
+            if len(sub_data) >= 8:
+                nikon_endian = "<" if sub_data[:2] == b"II" else ">" if sub_data[:2] == b"MM" else parent_endian
+                if sub_data[:2] in (b"II", b"MM") and len(sub_data) >= 8:
+                    ifd_start = struct.unpack(f"{nikon_endian}I", sub_data[4:8])[0]
+                else:
+                    ifd_start = 0
+                nikon_tags = {
+                    0x0001: "NikonMakerNoteVersion",
+                    0x0002: "NikonISOSetting",
+                    0x001D: "NikonSerialNumber",
+                    0x00A7: "NikonShutterCount",
+                    0x0084: "NikonLensInfo",
+                }
+                fields.extend(self._parse_sub_ifd(sub_data, ifd_start, nikon_endian, nikon_tags, "Nikon", maker_offset + hdr_len, block_abs_offset))
+
+        # 2. Apple (Starts with b"Apple iOS\x00")
+        elif raw_blob.startswith(b"Apple iOS\x00"):
+            sub_data = raw_blob[14:]
+            apple_tags = {
+                0x0001: "AppleMakerNoteVersion",
+                0x0003: "AppleRunTime",
+                0x000E: "AppleHDRImageType",
+                0x0017: "AppleSceneFlags",
+            }
+            fields.extend(self._parse_sub_ifd(sub_data, 0, parent_endian, apple_tags, "Apple", maker_offset + 14, block_abs_offset))
+
+        # 3. Sony (Starts with b"SONY DSC \x00")
+        elif raw_blob.startswith(b"SONY DSC \x00") or raw_blob.startswith(b"SONY MOBILE\x00"):
+            hdr_len = 12
+            sub_data = raw_blob[hdr_len:]
+            sony_tags = {
+                0x2001: "SonyModelID",
+                0x2010: "SonySequenceNumber",
+            }
+            fields.extend(self._parse_sub_ifd(sub_data, 0, parent_endian, sony_tags, "Sony", maker_offset + hdr_len, block_abs_offset))
+
+        # 4. Canon (Starts directly with entry count)
+        elif len(raw_blob) >= 4:
+            canon_tags = {
+                0x0001: "CanonCameraSettings",
+                0x0004: "CanonShotInfo",
+                0x0006: "CanonImageType",
+                0x0007: "CanonFirmwareVersion",
+                0x000C: "CanonSerialNumber",
+                0x0095: "CanonLensModel",
+            }
+            res = self._parse_sub_ifd(raw_blob, 0, parent_endian, canon_tags, "Canon", maker_offset, block_abs_offset)
+            if res:
+                fields.extend(res)
+
+        return fields
+
+    def _parse_sub_ifd(
+        self, sub_data: bytes, ifd_offset: int, endian: str, tag_dict: Dict[int, str], prefix: str, base_offset: int, block_abs_offset: int
+    ) -> List[Field]:
+        fields: List[Field] = []
+        size = len(sub_data)
+        if ifd_offset + 2 > size:
+            return fields
+
+        num_entries = struct.unpack(f"{endian}H", sub_data[ifd_offset : ifd_offset + 2])[0]
+        if num_entries == 0 or num_entries > 256 or (ifd_offset + 2 + num_entries * 12) > size:
+            return fields
+
+        curr = ifd_offset + 2
+        for _ in range(num_entries):
+            if curr + 12 > size:
+                break
+            tag_id, f_type, count, val_or_offset = struct.unpack(f"{endian}HHI I", sub_data[curr : curr + 12])
+            tag_name = tag_dict.get(tag_id, f"{prefix}Tag_0x{tag_id:04X}")
+            val, val_type = self._extract_value(sub_data, endian, f_type, count, val_or_offset)
+            if val is not None:
+                fields.append(
+                    Field(
+                        standard="EXIF",
+                        tag_id=f"0x{tag_id:04X}",
+                        name=f"MakerNote:{tag_name}",
+                        value=val,
+                        raw_value=val_or_offset,
+                        value_type=val_type,
+                        offset=block_abs_offset + base_offset + curr,
+                        value_offset=block_abs_offset + base_offset + (val_or_offset if count > 4 else curr + 8),
+                        length=count,
+                    )
+                )
+            curr += 12
+        return fields

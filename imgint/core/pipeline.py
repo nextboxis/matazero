@@ -32,6 +32,14 @@ from imgint.core.analyzer.verdict import AuthenticityEvaluator
 from imgint.core.governance.scope import AuthorizationScope, ScopeValidationError
 from imgint.core.governance.audit import AuditLogger
 from imgint.core.evidence.store import EvidenceStore, EvidenceCustodyError
+from imgint.core.event import (
+    ForensicEventBus,
+    AnalysisStartedEvent,
+    AnalysisCompletedEvent,
+    AnomalyDetectedEvent,
+    VerdictEvaluatedEvent,
+)
+from imgint.core.skill import SkillRegistry
 
 
 class AnalysisPipeline:
@@ -92,6 +100,9 @@ class AnalysisPipeline:
                 target_hash=file_sha256,
                 details={"file_path": str(path), "selected_tiers": list(self.selected_tiers)},
             )
+
+        # Publish AnalysisStartedEvent to ForensicEventBus
+        ForensicEventBus.get_default().publish(AnalysisStartedEvent(file_path=str(path)))
 
         # Create record
         record = AnalysisRecord(
@@ -275,7 +286,8 @@ class AnalysisPipeline:
             enable_ela=self.enable_ela,
         )
 
-        # Execute permitted Tier 4-7 analysers
+        # Execute permitted Tier 4-7 analysers & dynamic skills
+        skill_reg = SkillRegistry.get_default()
         for tier in (4, 5, 6, 7):
             if tier in self.selected_tiers:
                 for analyzer in self.analyzer_registry.get_analyzers_for_tier(tier):
@@ -291,6 +303,19 @@ class AnalysisPipeline:
                                 message=f"Analyzer {analyzer.id} failed: {e}",
                                 source=analyzer.id,
                             )
+                # Dynamic skills for this tier
+                for skill in skill_reg.get_skills_for_tier(tier, detected.format_name):
+                    try:
+                        f_list, d_list = skill.analyze(ctx)
+                        for f in f_list:
+                            record.add_finding(f)
+                        record.diagnostics.extend(d_list)
+                    except Exception as e:
+                        record.add_diagnostic(
+                            level="warning",
+                            message=f"Skill {skill.id} failed: {e}",
+                            source=skill.id,
+                        )
 
         # Update data stream hash on record
         for f in record.findings:
@@ -322,6 +347,17 @@ class AnalysisPipeline:
             )
         )
 
+        # Publish VerdictEvaluatedEvent
+        ForensicEventBus.get_default().publish(
+            VerdictEvaluatedEvent(
+                file_path=str(path),
+                sha256=file_sha256,
+                verdict_label=verdict.verdict_label,
+                confidence_score=verdict.confidence_score,
+                risk_level=verdict.risk_level,
+            )
+        )
+
         # GR-2.3: Re-verify evidence custody
         if self.evidence_store:
             self.evidence_store.verify_all_originals()
@@ -333,5 +369,15 @@ class AnalysisPipeline:
                 target_hash=file_sha256,
                 details={"findings_count": len(record.findings)},
             )
+
+        # Publish AnalysisCompletedEvent
+        ForensicEventBus.get_default().publish(
+            AnalysisCompletedEvent(
+                file_path=str(path),
+                sha256=file_sha256,
+                mime_type=record.mime_type,
+                findings_count=len(record.findings),
+            )
+        )
 
         return record

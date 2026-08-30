@@ -28,7 +28,7 @@ class ContentAnalyzer(Analyzer):
         diagnostics: List[Diagnostic] = []
 
         sandbox_res = SandboxRunner.run_decode_tasks(
-            ctx.file_path, tasks=["dimensions", "dominant_colors", "entropy"]
+            ctx.file_path, tasks=["dimensions", "dominant_colors", "entropy", "fft_frequency"]
         )
 
         if not sandbox_res.get("success"):
@@ -88,6 +88,24 @@ class ContentAnalyzer(Analyzer):
                         "noisy camera sensors, high-ISO captures, or textured gradients, and does not prove steganography."
                     ),
                     provenance=Provenance(source_layer="sandbox", extractor="sandboxed_pixel_decoder"),
+                )
+            )
+
+        # 2D FFT Frequency & Synthetic Grid Anomaly Screening
+        if "fft_frequency" in tasks:
+            fft_data = tasks["fft_frequency"]
+            findings.append(
+                Finding(
+                    name="fft_synthetic_artifact_screening",
+                    value=fft_data,
+                    tier=7,
+                    extractor="sandboxed_fft_analyzer",
+                    confidence=Confidence.INDICATIVE if fft_data.get("synthetic_grid_artifact") else Confidence.OBSERVED,
+                    caveat=(
+                        "2D FFT power spectrum analyzes periodic frequency spikes. High peak ratios (>18.0) indicate "
+                        "generative AI upsampling checkerboard grid patterns or regular geometric screen moiré."
+                    ),
+                    provenance=Provenance(source_layer="sandbox", extractor="sandboxed_fft_analyzer"),
                 )
             )
 

@@ -184,6 +184,12 @@ matazero <command> [options] [targets...]
 Commands:
   scope       Create, validate, or display an authorization scope
   analyze     Run 7 extraction tiers over evidence files (supports -r, --glob, --filter, -j)
+  diff        Forensic comparison between two images (structure, metadata, DQT, and pixels)
+  stego       Deep steganography, multi-channel bitplane slicing, and Chi-Square PoV inspection
+  timeline    Reconstruct multi-asset chronological timelines and estimate camera clock drift
+  cluster     Group evidence files by camera fleet, DQT tables, GPS proximity, or visual similarity
+  motion      Detect and carve embedded MP4/HEVC video streams from motion/live photos
+  export      Export forensic findings to SQLite database or STIX 2.1 Threat Intel bundles
   locate      Forensic geolocation, reverse geocoding, solar chronolocation, and interactive maps
   probe       Dump container segment and chunk structure with byte offsets
   extract     Extract embedded thumbnails, previews, payloads, metadata streams, or -x -y crops
@@ -196,7 +202,28 @@ Commands:
 ### Common Usage Examples
 
 ```bash
-# 1. Quick analysis: Clean Visual Executive Dashboard (Self-Audit mode for personal files)
+# 1. Forensic Image Comparison & Tampering Diff (Metadata, DQT, Perceptual Hashes, Pixel SSIM)
+python -m matazero diff photo1.jpg photo2.jpg -a
+
+# 2. Deep Steganography & Multi-Channel Bitplane Slicing (Planes 0-7, Chi-Square PoV Test)
+python -m matazero stego suspect.png -a --save-bitplanes ./bitplane_slices
+
+# 3. Case Chronological Timeline & Camera Clock Drift Reconstruction (Plaso/Timesketch & CSV)
+python -m matazero timeline ./case_images/ -a -r -f plaso -o timeline_plaso.csv
+
+# 4. Multi-Image Dataset Clustering & Fleet Outlier Detection
+python -m matazero cluster ./evidence_vault/ -a --by camera
+
+# 5. Extract and Carve Hidden MP4 Video from Samsung / Google Motion Photos
+python -m matazero motion motion_photo.jpg -c -o ./extracted_video.mp4
+
+# 6. Index Evidence Library into a Queryable SQLite Database for SQL Analytics
+python -m matazero export sqlite ./case_images/ -a -r -o ./case_vault.db
+
+# 7. Generate STIX 2.1 Threat Intelligence Bundle with Cyber Observable & Indicator Objects
+python -m matazero export stix ./malicious_evidence/ -a -o ./threat_bundle.json
+
+# 8. Quick analysis: Clean Visual Executive Dashboard (Self-Audit mode for personal files)
 python -m matazero analyze photo.jpg -a
 
 # 2. Deep Forensic Tree Breakdown: Full 7 tiers, complete tag & value byte locations

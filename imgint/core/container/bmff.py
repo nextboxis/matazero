@@ -98,6 +98,9 @@ class BmffContainerReader(ContainerReader):
                     )
                 )
 
-            offset += box_size
+            advance = max(header_len, box_size)
+            offset += advance
+            if offset <= 0 or advance <= 0:
+                break
 
         return units, blocks, diagnostics

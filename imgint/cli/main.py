@@ -33,6 +33,13 @@ from imgint.core.fingerprint.order import SegmentOrderExtractor
 from imgint.core.geo.locator import GeoLocator
 from imgint.core.geo.exporter import GeoExporter
 from imgint.core.report.cli_dashboard import CliDashboard
+from imgint.core.diff import ForensicComparator, DiffRenderer
+from imgint.core.stego import StegoInspector, StegoRenderer
+from imgint.core.timeline import TimelineReconstructor, TimelineExporter
+from imgint.core.motion import MotionPhotoDetector, MotionPhotoCarver, MotionPhotoRenderer
+from imgint.core.cluster import ClusterEngine, ClusterRenderer
+from imgint.core.export import SqliteExporter, StixExporter
+from imgint.core.skill import SkillRegistry
 import concurrent.futures
 
 try:
@@ -960,6 +967,389 @@ def corpus_learn(target: str, entry_id: str, model: str, encoder: str) -> None:
     console.print(f"  Encoder:     {encoder}")
     console.print(f"  Subsampling: {ss_str}")
     console.print(f"  DQT Samples: {len(lum_sample)} values")
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: diff (Forensic Differential Image Analysis)
+# -----------------------------------------------------------------------------
+@cli.command("diff")
+@click.argument("target_a", type=click.Path(exists=True))
+@click.argument("target_b", type=click.Path(exists=True))
+@click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "json"]), default="table", help="Output format")
+@click.option("-o", "--out", "out_file", default=None, type=click.Path(), help="Write diff report to file")
+@click.option("-s", "--scope", "scope_path", default=lambda: os.environ.get("IMGINT_SCOPE"), help="Path to authorization scope JSON")
+@click.option("-a", "--self-audit", is_flag=True, help="Operate in self-audit mode without an external scope")
+def diff(
+    target_a: str,
+    target_b: str,
+    out_fmt: str,
+    out_file: Optional[str],
+    scope_path: Optional[str],
+    self_audit: bool,
+) -> None:
+    """Forensic comparison between two images (structure, metadata, DQT, and pixels)."""
+    # Scope resolution
+    if self_audit:
+        auth_scope = AuthorizationScope.create_self_audit_scope()
+    elif scope_path:
+        try:
+            auth_scope = AuthorizationScope.load_from_file(scope_path)
+        except ScopeValidationError as e:
+            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
+            sys.exit(6)
+    else:
+        auth_scope = AuthorizationScope.create_self_audit_scope()
+
+    pipeline = AnalysisPipeline(scope=auth_scope, selected_tiers={1, 2, 3, 4, 5, 6, 7})
+    result = ForensicComparator.compare(target_a, target_b, pipeline=pipeline)
+
+    if out_fmt == "json":
+        rendered = DiffRenderer.render_json(result)
+        if out_file:
+            Path(out_file).write_text(rendered, encoding="utf-8")
+            console.print(f"[green][OK] Diff report written to {out_file}[/green]")
+        else:
+            print(rendered)
+    else:
+        DiffRenderer.render_terminal(result, console)
+        if out_file:
+            rendered = DiffRenderer.render_json(result)
+            Path(out_file).write_text(rendered, encoding="utf-8")
+            console.print(f"\n[green][OK] Full diff data written to {out_file}[/green]")
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: stego (Deep Steganography & Bitplane Slicer)
+# -----------------------------------------------------------------------------
+@cli.command("stego")
+@click.argument("target", type=click.Path(exists=True))
+@click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "json"]), default="table", help="Output format")
+@click.option("-o", "--out", "out_file", default=None, type=click.Path(), help="Write analysis report to file")
+@click.option("--save-bitplanes", "save_bp_dir", default=None, type=click.Path(), help="Directory to save extracted bitplane PNG images")
+@click.option("-s", "--scope", "scope_path", default=lambda: os.environ.get("IMGINT_SCOPE"), help="Path to authorization scope JSON")
+@click.option("-a", "--self-audit", is_flag=True, help="Operate in self-audit mode without an external scope")
+def stego(
+    target: str,
+    out_fmt: str,
+    out_file: Optional[str],
+    save_bp_dir: Optional[str],
+    scope_path: Optional[str],
+    self_audit: bool,
+) -> None:
+    """Deep Steganography, Multi-Channel Bitplane Slicing, and Chi-Square PoV Inspection."""
+    # Scope resolution
+    if self_audit:
+        auth_scope = AuthorizationScope.create_self_audit_scope()
+    elif scope_path:
+        try:
+            auth_scope = AuthorizationScope.load_from_file(scope_path)
+        except ScopeValidationError as e:
+            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
+            sys.exit(6)
+    else:
+        auth_scope = AuthorizationScope.create_self_audit_scope()
+
+    result = StegoInspector.inspect(target, save_bitplanes_dir=save_bp_dir)
+
+    if out_fmt == "json":
+        rendered = StegoRenderer.render_json(result)
+        if out_file:
+            Path(out_file).write_text(rendered, encoding="utf-8")
+            console.print(f"[green][OK] Stego report written to {out_file}[/green]")
+        else:
+            print(rendered)
+    else:
+        StegoRenderer.render_terminal(result, console)
+        if out_file:
+            rendered = StegoRenderer.render_json(result)
+            Path(out_file).write_text(rendered, encoding="utf-8")
+            console.print(f"\n[green][OK] Full stego data written to {out_file}[/green]")
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: timeline (Forensic Chronology & Clock Drift Reconstruction)
+# -----------------------------------------------------------------------------
+@cli.command("timeline")
+@click.argument("targets", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "json", "csv", "plaso"]), default="table", help="Output format")
+@click.option("-o", "--out", "out_file", default=None, type=click.Path(), help="Write timeline to file")
+@click.option("-r", "--recursive", is_flag=True, help="Recursively search directory targets for images")
+@click.option("--glob", "glob_pattern", default=None, help="Glob pattern to filter files (e.g. '*.jpg')")
+@click.option("-s", "--scope", "scope_path", default=lambda: os.environ.get("IMGINT_SCOPE"), help="Path to authorization scope JSON")
+@click.option("-a", "--self-audit", is_flag=True, help="Operate in self-audit mode without an external scope")
+def timeline(
+    targets: List[str],
+    out_fmt: str,
+    out_file: Optional[str],
+    recursive: bool,
+    glob_pattern: Optional[str],
+    scope_path: Optional[str],
+    self_audit: bool,
+) -> None:
+    """Reconstruct multi-asset chronological timelines and estimate camera clock drift."""
+    # Scope resolution
+    if self_audit:
+        auth_scope = AuthorizationScope.create_self_audit_scope()
+    elif scope_path:
+        try:
+            auth_scope = AuthorizationScope.load_from_file(scope_path)
+        except ScopeValidationError as e:
+            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
+            sys.exit(6)
+    else:
+        auth_scope = AuthorizationScope.create_self_audit_scope()
+
+    resolved_targets = _expand_file_targets(targets, recursive=recursive, glob_pattern=glob_pattern)
+    if not resolved_targets:
+        err_console.print("[yellow]No matching image evidence files found to reconstruct timeline.[/yellow]")
+        return
+
+    pipeline = AnalysisPipeline(scope=auth_scope, selected_tiers={1, 5, 6})
+    report = TimelineReconstructor.reconstruct(resolved_targets, pipeline=pipeline)
+
+    if out_fmt == "json":
+        rendered = TimelineExporter.to_json(report)
+    elif out_fmt in ("csv", "plaso"):
+        rendered = TimelineExporter.to_plaso_csv(report)
+    else:  # table
+        TimelineExporter.render_terminal(report, console)
+        rendered = ""
+
+    if rendered:
+        if out_file:
+            Path(out_file).write_text(rendered, encoding="utf-8")
+            console.print(f"[green][OK] Timeline written to {out_file}[/green]")
+        else:
+            print(rendered)
+    elif out_file:
+        Path(out_file).write_text(TimelineExporter.to_json(report), encoding="utf-8")
+        console.print(f"\n[green][OK] Timeline data written to {out_file}[/green]")
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: motion (Motion & Live Photo Video Carving)
+# -----------------------------------------------------------------------------
+@cli.command("motion")
+@click.argument("target", type=click.Path(exists=True))
+@click.option("-c", "--carve", is_flag=True, help="Carve embedded video stream to disk")
+@click.option("-o", "--out", "out_path", default=None, type=click.Path(), help="Output path/directory for carved video")
+@click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "json"]), default="table", help="Output format")
+def motion(
+    target: str,
+    carve: bool,
+    out_path: Optional[str],
+    out_fmt: str,
+) -> None:
+    """Detect and carve embedded MP4/HEVC video streams from Samsung/Pixel/Apple motion photos."""
+    if carve:
+        info = MotionPhotoCarver.carve(target, output_file=out_path if out_path and out_path.endswith((".mp4", ".mov")) else None, output_dir=out_path)
+    else:
+        info = MotionPhotoDetector.detect(target)
+
+    if out_fmt == "json":
+        print(MotionPhotoRenderer.render_json(info))
+    else:
+        MotionPhotoRenderer.render_terminal(info, console)
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: cluster (Multi-Image Fleet & Anomaly Triage)
+# -----------------------------------------------------------------------------
+@cli.command("cluster")
+@click.argument("targets", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("--by", "strategy", type=click.Choice(["camera", "dqt", "geo", "visual"]), default="camera", help="Clustering dimension (default: camera)")
+@click.option("--radius", "geo_radius", default=5.0, type=float, help="Geospatial clustering radius in km (default: 5.0)")
+@click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "json"]), default="table", help="Output format")
+@click.option("-o", "--out", "out_file", default=None, type=click.Path(), help="Write clustering report to file")
+@click.option("-r", "--recursive", is_flag=True, help="Recursively search directory targets for images")
+@click.option("--glob", "glob_pattern", default=None, help="Glob pattern to filter files (e.g. '*.jpg')")
+@click.option("-s", "--scope", "scope_path", default=lambda: os.environ.get("IMGINT_SCOPE"), help="Path to authorization scope JSON")
+@click.option("-a", "--self-audit", is_flag=True, help="Operate in self-audit mode without an external scope")
+def cluster(
+    targets: List[str],
+    strategy: str,
+    geo_radius: float,
+    out_fmt: str,
+    out_file: Optional[str],
+    recursive: bool,
+    glob_pattern: Optional[str],
+    scope_path: Optional[str],
+    self_audit: bool,
+) -> None:
+    """Group evidence files by camera fleet, DQT tables, GPS proximity, or visual similarity."""
+    # Scope resolution
+    if self_audit:
+        auth_scope = AuthorizationScope.create_self_audit_scope()
+    elif scope_path:
+        try:
+            auth_scope = AuthorizationScope.load_from_file(scope_path)
+        except ScopeValidationError as e:
+            err_console.print(f"[red]Authorization failure (Exit 6): {e}[/red]")
+            sys.exit(6)
+    else:
+        auth_scope = AuthorizationScope.create_self_audit_scope()
+
+    resolved_targets = _expand_file_targets(targets, recursive=recursive, glob_pattern=glob_pattern)
+    if not resolved_targets:
+        err_console.print("[yellow]No matching image evidence files found to cluster.[/yellow]")
+        return
+
+    pipeline = AnalysisPipeline(scope=auth_scope, selected_tiers={1, 2, 4, 5, 6})
+    report = ClusterEngine.cluster(resolved_targets, strategy=strategy, geo_radius_km=geo_radius, pipeline=pipeline)
+
+    if out_fmt == "json":
+        rendered = ClusterRenderer.render_json(report)
+        if out_file:
+            Path(out_file).write_text(rendered, encoding="utf-8")
+            console.print(f"[green][OK] Cluster data written to {out_file}[/green]")
+        else:
+            print(rendered)
+    else:
+        ClusterRenderer.render_terminal(report, console)
+        if out_file:
+            Path(out_file).write_text(ClusterRenderer.render_json(report), encoding="utf-8")
+            console.print(f"\n[green][OK] Cluster data written to {out_file}[/green]")
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: export (Database & Threat Intelligence Bundles)
+# -----------------------------------------------------------------------------
+@cli.group("export")
+def export_group() -> None:
+    """Export forensic findings to SQLite database or STIX 2.1 Threat Intel bundles."""
+    pass
+
+
+@export_group.command("sqlite")
+@click.argument("targets", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("-o", "--out", "db_path", default="./evidence_vault.db", type=click.Path(), help="Destination SQLite database file (default: ./evidence_vault.db)")
+@click.option("-r", "--recursive", is_flag=True, help="Recursively search directory targets for images")
+@click.option("--glob", "glob_pattern", default=None, help="Glob pattern to filter files")
+@click.option("-s", "--scope", "scope_path", default=lambda: os.environ.get("IMGINT_SCOPE"), help="Path to authorization scope JSON")
+@click.option("-a", "--self-audit", is_flag=True, help="Operate in self-audit mode")
+def export_sqlite(
+    targets: List[str],
+    db_path: str,
+    recursive: bool,
+    glob_pattern: Optional[str],
+    scope_path: Optional[str],
+    self_audit: bool,
+) -> None:
+    """Index analysis records into a structured, queryable SQLite relational database."""
+    auth_scope = AuthorizationScope.create_self_audit_scope() if self_audit or not scope_path else AuthorizationScope.load_from_file(scope_path)
+    resolved_targets = _expand_file_targets(targets, recursive=recursive, glob_pattern=glob_pattern)
+    if not resolved_targets:
+        err_console.print("[yellow]No matching image files to export.[/yellow]")
+        return
+
+    pipeline = AnalysisPipeline(scope=auth_scope, selected_tiers={1, 2, 3, 4, 5, 6, 7})
+    records = [pipeline.analyze_file(t) for t in resolved_targets]
+    out_db = SqliteExporter.export(records, db_path)
+    console.print(f"[green][OK] Successfully indexed {len(records)} evidence images into SQLite database: [bold]{out_db}[/bold][/green]")
+
+
+@export_group.command("stix")
+@click.argument("targets", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("-o", "--out", "out_file", default=None, type=click.Path(), help="Destination STIX 2.1 JSON file")
+@click.option("-r", "--recursive", is_flag=True, help="Recursively search directory targets for images")
+@click.option("--glob", "glob_pattern", default=None, help="Glob pattern to filter files")
+@click.option("-s", "--scope", "scope_path", default=lambda: os.environ.get("IMGINT_SCOPE"), help="Path to authorization scope JSON")
+@click.option("-a", "--self-audit", is_flag=True, help="Operate in self-audit mode")
+def export_stix(
+    targets: List[str],
+    out_file: Optional[str],
+    recursive: bool,
+    glob_pattern: Optional[str],
+    scope_path: Optional[str],
+    self_audit: bool,
+) -> None:
+    """Generate STIX 2.1 Threat Intelligence Bundle with Cyber Observable and Indicator Objects."""
+    auth_scope = AuthorizationScope.create_self_audit_scope() if self_audit or not scope_path else AuthorizationScope.load_from_file(scope_path)
+    resolved_targets = _expand_file_targets(targets, recursive=recursive, glob_pattern=glob_pattern)
+    if not resolved_targets:
+        err_console.print("[yellow]No matching image files to export.[/yellow]")
+        return
+
+    pipeline = AnalysisPipeline(scope=auth_scope, selected_tiers={1, 2, 3, 4, 5, 6, 7})
+    records = [pipeline.analyze_file(t) for t in resolved_targets]
+    bundle = StixExporter.export(records)
+    rendered = json.dumps(bundle, indent=2)
+
+    if out_file:
+        Path(out_file).write_text(rendered, encoding="utf-8")
+        console.print(f"[green][OK] STIX 2.1 Threat Intel Bundle ({len(bundle['objects'])} objects) written to [bold]{out_file}[/bold][/green]")
+    else:
+        print(rendered)
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: skill (Microkernel Skills & Extensible Plugins)
+# -----------------------------------------------------------------------------
+@cli.group("skill")
+def skill_group() -> None:
+    """Manage and inspect dynamically loaded forensic skills and plugins."""
+    pass
+
+
+@skill_group.command("list")
+def skill_list() -> None:
+    """List all currently discovered and loaded forensic skills."""
+    registry = SkillRegistry.get_default()
+    skills = registry.list_skills()
+
+    if not skills:
+        console.print("[dim]No external skills discovered in ~/.matazero/skills or ./.matazero/skills.[/dim]")
+        return
+
+    table = Table(title=f"Discovered Forensic Skills ({len(skills)} Loaded)", border_style="cyan")
+    table.add_column("Skill ID", style="bold cyan")
+    table.add_column("Name", style="white")
+    table.add_column("Version", style="green")
+    table.add_column("Tier", justify="center", style="yellow")
+    table.add_column("Formats", style="magenta")
+    table.add_column("Description", style="dim")
+
+    for s in skills:
+        table.add_row(
+            s.id,
+            s.name,
+            s.version,
+            str(s.target_tier),
+            ", ".join(s.supported_formats),
+            s.description,
+        )
+
+    console.print(table)
+
+
+@skill_group.command("info")
+@click.argument("skill_id")
+def skill_info(skill_id: str) -> None:
+    """Display detailed manifest and metadata for a specific forensic skill."""
+    registry = SkillRegistry.get_default()
+    skill = registry.get_skill(skill_id)
+
+    if not skill:
+        err_console.print(f"[red]Skill '{skill_id}' not found in registry.[/red]")
+        return
+
+    panel_content = Text()
+    panel_content.append(f"Skill ID:        ", style="dim")
+    panel_content.append(f"{skill.id}\n", style="bold cyan")
+    panel_content.append(f"Name:            ", style="dim")
+    panel_content.append(f"{skill.name}\n", style="bold white")
+    panel_content.append(f"Version:         ", style="dim")
+    panel_content.append(f"{skill.version}\n", style="green")
+    panel_content.append(f"Execution Tier:  ", style="dim")
+    panel_content.append(f"Tier {skill.target_tier}\n", style="yellow")
+    panel_content.append(f"Target Formats:  ", style="dim")
+    panel_content.append(f"{', '.join(skill.supported_formats)}\n", style="magenta")
+    panel_content.append(f"Pixel Decode:    ", style="dim")
+    panel_content.append(f"{'Required' if skill.requires_decode else 'No'}\n", style="white")
+    panel_content.append(f"\nDescription:\n", style="bold dim")
+    panel_content.append(f"{skill.description or 'No description provided.'}\n", style="white")
+
+    console.print(Panel(panel_content, title="[bold]Forensic Skill Details[/bold]", border_style="cyan"))
 
 
 # -----------------------------------------------------------------------------

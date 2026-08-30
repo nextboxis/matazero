@@ -69,6 +69,14 @@ class AuthenticityEvaluator:
                 reasons.append("High LSB entropy density detected (potential steganographic carrier or dense texture).")
                 score -= 0.15
 
+        # 3b. Check 2D FFT Synthetic Grid Frequency Anomaly (Tier 7)
+        fft_f = next((f for f in record.findings if f.name == "fft_synthetic_artifact_screening"), None)
+        if fft_f and isinstance(fft_f.value, dict) and fft_f.value.get("synthetic_grid_artifact"):
+            flags["ai_generation_detected"] = True
+            reasons.append(f"2D FFT power spectrum detected periodic checkerboard grid artifacts (Peak ratio: {fft_f.value.get('fft_peak_ratio')}).")
+            score = min(score, 0.2)
+            risk_level = "HIGH"
+
         # 4. Check Encoder Attribution (Tier 2)
         attr_f = next((f for f in record.findings if f.name == "encoder_attribution"), None)
         if attr_f and isinstance(attr_f.value, dict):

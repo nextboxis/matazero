@@ -25,6 +25,7 @@ class SandboxRunner:
         tasks: Optional[List[str]] = None,
         extra_params: Optional[Dict[str, Any]] = None,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         req_tasks = tasks or ["dimensions", "phashes", "dominant_colors", "entropy"]
         payload: Dict[str, Any] = {
@@ -33,6 +34,8 @@ class SandboxRunner:
         }
         if extra_params:
             payload.update(extra_params)
+        if kwargs:
+            payload.update(kwargs)
         input_json = json.dumps(payload)
 
         # Ensure child process can always locate imgint package
