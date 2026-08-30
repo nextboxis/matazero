@@ -11,6 +11,8 @@ from typing import List, Optional
 import click
 from rich.console import Console
 from rich.table import Table
+from rich.panel import Panel
+from rich.text import Text
 
 from imgint import __version__
 from imgint.core.evidence.store import EvidenceStore, EvidenceCustodyError
@@ -41,6 +43,9 @@ from imgint.core.cluster import ClusterEngine, ClusterRenderer
 from imgint.core.export import SqliteExporter, StixExporter
 from imgint.core.skill import SkillRegistry
 from imgint.core.ai import OllamaClient, OllamaRenderer
+from imgint.core.diag import DiagnosticRunner
+from imgint.core.report import CaseDossierGenerator
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
 import concurrent.futures
 
 try:
@@ -1437,6 +1442,132 @@ def model_list(host: str, out_fmt: str) -> None:
         }, indent=2))
     else:
         OllamaRenderer.render_models_table(models, is_online, console)
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: doctor (System Environment & Diagnostic Suite)
+# -----------------------------------------------------------------------------
+@cli.command("doctor")
+def doctor() -> None:
+    """Run system health and diagnostic checks across all forensic engines."""
+    DiagnosticRunner.run_all_checks(console)
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: scan (Smart 1-Command Evidence Auto-Triage)
+# -----------------------------------------------------------------------------
+@cli.command("scan")
+@click.argument("target", type=click.Path(exists=True))
+@click.option("-s", "--scope", "scope_path", default=lambda: os.environ.get("IMGINT_SCOPE"), help="Authorization scope JSON path")
+@click.option("-a", "--self-audit", is_flag=True, default=True, help="Run in self-audit mode (default: True)")
+@click.option("-o", "--report", "report_path", default="./case_dossier.html", help="Path for HTML Case Dossier output (default: case_dossier.html)")
+@click.option("-j", "--jobs", default=4, type=int, help="Parallel worker threads (default: 4)")
+@click.option("-c", "--carve", is_flag=True, help="Automatically carve payloads and motion videos")
+def scan(
+    target: str,
+    scope_path: Optional[str],
+    self_audit: bool,
+    report_path: str,
+    jobs: int,
+    carve: bool,
+) -> None:
+    """Smart 1-command evidence auto-triage with live progress and HTML dossier."""
+    # Scope resolution
+    auth_scope = AuthorizationScope.create_self_audit_scope() if self_audit or not scope_path else None
+    if not auth_scope and scope_path:
+        try:
+            auth_scope = AuthorizationScope.load_from_file(scope_path)
+        except ScopeValidationError as e:
+            err_console.print(f"[bold red]Authorization failure (Exit 6): {e}[/bold red]")
+            sys.exit(6)
+
+    pipeline = AnalysisPipeline(scope=auth_scope)
+
+    target_path = Path(target)
+    targets = [str(target_path)] if target_path.is_file() else [str(target_path)]
+    resolved_targets = _expand_file_targets(targets, recursive=True)
+
+    if not resolved_targets:
+        err_console.print(
+            Panel(
+                f"[yellow][!] No matching image evidence files found in {target}[/yellow]\n"
+                "[dim]Supported formats: JPEG, PNG, TIFF, WebP, HEIC/AVIF, BMP, GIF, Office (.docx/.pptx)[/dim]",
+                title="[bold]Empty Evidence Target[/bold]",
+                border_style="yellow",
+            )
+        )
+        return
+
+    console.print(f"[bold cyan]🔍 Starting Smart Auto-Triage on {len(resolved_targets)} evidence item(s)...[/bold cyan]\n")
+
+    records: List[AnalysisRecord] = []
+    authentic_count = 0
+    tampered_count = 0
+    synthetic_count = 0
+    unverified_count = 0
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold cyan]{task.description}[/bold cyan]"),
+        BarColumn(bar_width=40, style="cyan", complete_style="bold green"),
+        TaskProgressColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    ) as progress:
+        task_id = progress.add_task("Triaging Evidence", total=len(resolved_targets))
+
+        def _process_item(p: Path):
+            try:
+                rec = pipeline.analyze_file(p)
+                if carve and rec.structural_units:
+                    reader = BoundedReader(p)
+                    PayloadCarver.carve_trailing_payload(reader, rec.structural_units, "./evidence_store/carved")
+                return rec, None
+            except Exception as e:
+                return None, f"Error processing {p.name}: {e}"
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, jobs)) as executor:
+            future_to_file = {executor.submit(_process_item, f): f for f in resolved_targets}
+            for fut in concurrent.futures.as_completed(future_to_file):
+                rec, err = fut.result()
+                progress.advance(task_id)
+                if rec:
+                    records.append(rec)
+                    rating = (rec.authenticity_verdict or {}).get("rating", "")
+                    if "AUTHENTIC" in rating:
+                        authentic_count += 1
+                    elif "TAMPERED" in rating:
+                        tampered_count += 1
+                    elif "SYNTHETIC" in rating:
+                        synthetic_count += 1
+                    else:
+                        unverified_count += 1
+
+    # Generate HTML Dossier Report
+    CaseDossierGenerator.generate_html(records, case_title=f"Triage: {target_path.name}", output_path=report_path)
+
+    # Print Executive Summary Card
+    summary_text = Text()
+    summary_text.append("Evidence Processed: ", style="dim")
+    summary_text.append(f"{len(records)} files\n", style="bold white")
+    summary_text.append("Authentic Captures: ", style="dim")
+    summary_text.append(f"{authentic_count} ({(authentic_count/max(1,len(records)))*100:.0f}%)\n", style="bold green")
+    summary_text.append("Tampered / Spliced: ", style="dim")
+    summary_text.append(f"{tampered_count}\n", style="bold red")
+    summary_text.append("AI / Synthetic:     ", style="dim")
+    summary_text.append(f"{synthetic_count}\n", style="bold magenta")
+    summary_text.append("Stripped / Other:   ", style="dim")
+    summary_text.append(f"{unverified_count}\n\n", style="bold yellow")
+    summary_text.append("Interactive HTML Dossier Generated:\n", style="dim")
+    summary_text.append(f"↳ {Path(report_path).resolve()}\n", style="bold cyan underline")
+
+    console.print(
+        Panel(
+            summary_text,
+            title="[bold green]Smart Triage Complete[/bold green]",
+            border_style="green",
+        )
+    )
 
 
 # -----------------------------------------------------------------------------

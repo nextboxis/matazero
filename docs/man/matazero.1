@@ -1,4 +1,4 @@
-﻿.\" Manpage for matazero
+.\" Manpage for matazero
 .TH MATAZERO 1 "August 2026" "matazero 0.1.0" "User Commands"
 .SH NAME
 matazero \- Image Intelligence Toolkit for Ethical OSINT and Digital Forensics
@@ -20,6 +20,12 @@ is a courtroom-grade, offline-first digital image forensics and ethical open-sou
 The tool operates strictly air-gapped with zero telemetry and contains hardcoded refusal logic against biometric facial recognition and bulk scraping.
 
 .SH COMMANDS
+.TP
+.B doctor
+Run system health and diagnostic checks across all forensic engines, sandboxed workers, Ollama, and storage.
+.TP
+.B scan \fITARGET\fR
+Smart 1-command evidence auto-triage with live progress bars and interactive HTML Case Dossier generation.
 .TP
 .B analyze \fITARGETS...\fR
 Run 7 forensic extraction tiers over image files or directories.

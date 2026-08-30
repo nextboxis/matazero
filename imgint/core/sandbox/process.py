@@ -29,9 +29,10 @@ class SandboxRunner:
     ) -> Dict[str, Any]:
         req_tasks = tasks or ["dimensions", "phashes", "dominant_colors", "entropy"]
         payload: Dict[str, Any] = {
-            "file_path": str(Path(file_path).resolve()),
             "tasks": req_tasks,
         }
+        if file_path:
+            payload["file_path"] = str(Path(file_path).resolve())
         if extra_params:
             payload.update(extra_params)
         if kwargs:

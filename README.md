@@ -264,10 +264,16 @@ python -m matazero export sqlite ./case_images/ -a -r -o ./case_vault.db
 # 7. Generate STIX 2.1 Threat Intelligence Bundle with Cyber Observable & Indicator Objects
 python -m matazero export stix ./malicious_evidence/ -a -o ./threat_bundle.json
 
-# 8. Quick analysis: Clean Visual Executive Dashboard (Self-Audit mode for personal files)
+# 1. System Health & Environment Diagnostic (Zero-troubleshooting verification)
+python -m matazero doctor
+
+# 2. Smart 1-Command Evidence Auto-Triage (Live progress bars & Interactive HTML Dossier)
+python -m matazero scan ./case_photos -o case_dossier.html
+
+# 3. Quick analysis: Clean Visual Executive Dashboard (Self-Audit mode for personal files)
 python -m matazero analyze photo.jpg -a
 
-# 2. Deep Forensic Tree Breakdown: Full 7 tiers, complete tag & value byte locations
+# 4. Deep Forensic Tree Breakdown: Full 7 tiers, complete tag & value byte locations
 python -m matazero analyze photo.jpg -a --deep
 
 # 3. Analyze PowerPoint (.pptx) or Word (.docx) presentation / document
