@@ -48,11 +48,17 @@ Even when social media platforms strip EXIF metadata, `matazero` analyzes the un
 ## Key Features
 
 * **Attribution Without Metadata**: Reconstructs encoder profiles from raw quantization tables (`DQT`), Huffman tables (`DHT`), and chroma subsampling (`SOF`) against a database of 22+ smartphone, DSLR, social media, and AI generator fingerprints.
+* **1-Command Smart Triage** (`matazero scan`): Auto-triages entire evidence folders with live progress bars, categorizing files as 🟢 Authentic, 🔴 Tampered, 🟣 AI/Synthetic, or 🟡 Inconclusive — with an interactive HTML Case Dossier generated automatically.
+* **System Health Diagnostic** (`matazero doctor`): Verifies Python runtime, sandboxed workers, local Ollama AI, storage vault, and man pages in a single command.
+* **JPEG Ghost & Double Compression Detection**: Detects recompression artifacts and spliced regions by analyzing error surfaces across quality levels with optimized full-image pre-computation.
+* **CFA Bayer Demosaicing Analysis**: Distinguishes physical camera captures from AI-generated images (Midjourney, DALL-E, Flux) by detecting Bayer filter interpolation periodicity in the green channel.
+* **Copy-Move Clone Detection**: Identifies cloned/duplicated regions using block feature matching and canonicalized shift vector clustering.
+* **Local AI Vision Interrogation** (`matazero ask`): Interrogate evidence images with local Ollama vision models (llama3.2-vision, moondream) — 100% offline, zero cloud API calls.
+* **Interactive Dark-Mode HTML Case Dossier**: Generates standalone, responsive `.html` case reports with embedded Leaflet GPS maps, KPI cards, live search, and court-ready evidence tables.
 * **Camera Fingerprint Learning**: Learn and save custom device signatures directly into your local corpus (`matazero corpus learn`).
-* **Interactive Standalone HTML Dossier**: Generates a self-contained, air-gapped HTML report (`-f html`) with an interactive SVG solar compass dial and structural byte map.
 * **Automatic Payload Carver**: Detects and extracts hidden trailing archives (ZIP, RAR, 7z, TAR, GZ, Executables) appended past the image end marker (`-c` / `--carve`).
 * **Multi-Format Container Walk**: Inspects segment structures for JPEG, PNG, TIFF/RAW (DNG, CR2, NEF, ARW, RAF), animated GIF, WebP, and ISO-BMFF (HEIC/AVIF).
-* **Process Isolation Sandbox**: Quarantines pixel decoding inside a restricted subprocess to protect the host system against malicious image parser exploits.
+* **Process Isolation Sandbox**: Quarantines pixel decoding inside a restricted subprocess with per-task error isolation to protect the host system against malicious image parser exploits.
 * **Chain of Custody & Audit Logging**: Cryptographically verifies evidence integrity using SHA-256 hashing and append-only hash-chained audit logs.
 * **100% Offline & Private**: Zero telemetry, zero cloud dependencies. Solar calculations and reverse geocoding run entirely local.
 
@@ -68,7 +74,7 @@ Even when social media platforms strip EXIF metadata, `matazero` analyzes the un
 | **Tier 4** | **Cryptographic Hashes** | Whole-file SHA-256, pure image data-stream SHA-256 (excludes metadata to detect re-tagging), and perceptual hashes (aHash, dHash, pHash). |
 | **Tier 5** | **Geospatial & Temporal** | GPS coordinates, altitude, offline GeoNames reverse geocoding, NOAA solar azimuth/elevation chronolocation, and timestamp consistency checks. |
 | **Tier 6** | **Forensic Indicators & Verdicts** | Ground-truth authenticity verdicts, timeline inversions (`ModifyDate` vs `DateTimeOriginal`), Error Level Analysis (ELA via `--ela`), and metadata absence analysis. |
-| **Tier 7** | **Content-Derived Signals** | Sandboxed image dimensions, aspect ratio, dominant color palette approximation, and LSB entropy screening. |
+| **Tier 7** | **Content & AI Analysis** | JPEG ghost double-compression detection, CFA Bayer demosaicing periodicity (camera vs AI-synthetic), copy-move clone detection, local Ollama vision AI interrogation, and LSB entropy screening. |
 
 ---
 
@@ -223,8 +229,10 @@ matazero completion fish > ~/.config/fish/completions/matazero.fish
 matazero <command> [options] [targets...]
 
 Commands:
-  scope       Create, validate, or display an authorization scope
+  doctor      System health & environment diagnostic (Python, sandbox, Ollama, storage)
+  scan        Smart 1-command evidence auto-triage with live progress and HTML dossier
   analyze     Run 7 extraction tiers over evidence files (supports -r, --glob, --filter, -j)
+  ask         Interrogate an evidence image using your local Ollama vision model (offline)
   diff        Forensic comparison between two images (structure, metadata, DQT, and pixels)
   stego       Deep steganography, multi-channel bitplane slicing, and Chi-Square PoV inspection
   timeline    Reconstruct multi-asset chronological timelines and estimate camera clock drift
@@ -235,6 +243,9 @@ Commands:
   probe       Dump container segment and chunk structure with byte offsets
   extract     Extract embedded thumbnails, previews, payloads, metadata streams, or -x -y crops
   corpus      Manage and inspect the reference encoder fingerprint corpus
+  model       Manage and inspect local Ollama vision models
+  skill       Manage and inspect dynamically loaded forensic skills
+  scope       Create, validate, or display an authorization scope
   audit       Verify or export the tamper-evident audit log
   clean       Losslessly remove metadata in self-audit mode
   completion  Generate shell completion scripts (bash, zsh, fish)
@@ -243,97 +254,88 @@ Commands:
 ### Common Usage Examples
 
 ```bash
-# 1. Forensic Image Comparison & Tampering Diff (Metadata, DQT, Perceptual Hashes, Pixel SSIM)
-python -m matazero diff photo1.jpg photo2.jpg -a
-
-# 2. Deep Steganography & Multi-Channel Bitplane Slicing (Planes 0-7, Chi-Square PoV Test)
-python -m matazero stego suspect.png -a --save-bitplanes ./bitplane_slices
-
-# 3. Case Chronological Timeline & Camera Clock Drift Reconstruction (Plaso/Timesketch & CSV)
-python -m matazero timeline ./case_images/ -a -r -f plaso -o timeline_plaso.csv
-
-# 4. Multi-Image Dataset Clustering & Fleet Outlier Detection
-python -m matazero cluster ./evidence_vault/ -a --by camera
-
-# 5. Extract and Carve Hidden MP4 Video from Samsung / Google Motion Photos
-python -m matazero motion motion_photo.jpg -c -o ./extracted_video.mp4
-
-# 6. Index Evidence Library into a Queryable SQLite Database for SQL Analytics
-python -m matazero export sqlite ./case_images/ -a -r -o ./case_vault.db
-
-# 7. Generate STIX 2.1 Threat Intelligence Bundle with Cyber Observable & Indicator Objects
-python -m matazero export stix ./malicious_evidence/ -a -o ./threat_bundle.json
-
-# 1. System Health & Environment Diagnostic (Zero-troubleshooting verification)
+# 1. System Health & Environment Diagnostics (Verify sandbox, Ollama, vault)
 python -m matazero doctor
 
 # 2. Smart 1-Command Evidence Auto-Triage (Live progress bars & Interactive HTML Dossier)
 python -m matazero scan ./case_photos -o case_dossier.html
 
-# 3. Quick analysis: Clean Visual Executive Dashboard (Self-Audit mode for personal files)
+# 3. Quick Analysis: Clean Visual Executive Dashboard (Self-Audit mode for personal files)
 python -m matazero analyze photo.jpg -a
 
 # 4. Deep Forensic Tree Breakdown: Full 7 tiers, complete tag & value byte locations
 python -m matazero analyze photo.jpg -a --deep
 
-# 3. Analyze PowerPoint (.pptx) or Word (.docx) presentation / document
-python -m matazero analyze presentation.pptx -a
-
-# 4. Extract all embedded slide images, speaker notes, and metadata from PowerPoint (.pptx)
-python -m matazero extract presentation.pptx -a -o ./extracted_presentation_media
-
-# 5. Forensic Geolocation: Coordinates, reverse geocoding, solar angles & map links
-python -m matazero locate photo.jpg -a
-
-# 6. Multi-image spatial relation, geodesic distance, velocity & travel anomaly check
-python -m matazero locate photo1.jpg photo2.jpg -a
-
-# 7. Generate an interactive standalone Leaflet / OpenStreetMap HTML dossier map
-python -m matazero locate ./case_photos -a -r -f html -o dossier_map.html
-
-# 8. Export RFC 7946 GeoJSON FeatureCollection with trajectory LineStrings for GIS/QGIS
-python -m matazero locate ./case_photos -a -r -f geojson -o case_evidence.geojson
-
-# 9. Export standard GPX 1.1 tracks for GPS track analysis
-python -m matazero locate ./case_photos -a -r -f gpx -o evidence_track.gpx
-
-# 10. Extract all embedded artefacts, previews, metadata streams, and payloads
-python -m matazero extract photo.jpg -o ./extracted_assets -a
-
-# 11. Extract a region crop and pixel color at specific -x, -y coordinates
-python -m matazero extract photo.jpg -x 150 -y 200 -w 300 -h 300 -o ./crops
-
-# 12. Complex batch query: recursive directory scan, filtered by GPS, with 8 worker threads
-python -m matazero analyze ./evidence_drive -a -r --glob "*.jpg" --filter "has_gps" -j 8 -f json -o results.json
-
-# 13. Probe container segments and metadata tag/value byte locations
-python -m matazero probe photo.jpg
-
-# 14. Create an authorization scope for forensic custody
-python -m matazero scope create -c "CASE-2026-01" -p "Forensic Ingest" -l "Warrant" -a "Lead Investigator" -o scope.json
-python -m matazero scope validate scope.json
-
-# 15. Run scoped analysis under legal custody
-python -m matazero analyze evidence.jpg -s scope.json
-
-# 16. Learn a new camera hardware fingerprint from a reference shot
-python -m matazero corpus learn ref_shot.jpg -i canon_r5 -m "Canon EOS R5" -e "DIGIC X Hardware ISP"
-
-# 17. Verify audit log tamper-resistance
-python -m matazero audit verify ./audit.jsonl
-
-# 18. Losslessly strip metadata while preserving raw pixel streams
-python -m matazero clean photo.jpg -o cleaned.jpg -c
-
-# 19. Discover and list locally installed Ollama vision models
-python -m matazero model list
-
-# 20. Interrogate an evidence photo using your local Ollama vision model (100% offline)
+# 5. Local AI Vision Interrogation: Ask questions about evidence images (100% offline via Ollama)
 python -m matazero ask crime_scene.jpg "What make, model, and color is the vehicle in the background?"
 python -m matazero ask suspect.jpg "Are there any physical or lighting inconsistencies suggesting synthetic generation?"
 
-# 21. Run Tier 7 AI visual examination integrated directly into full forensic analysis
+# 6. Integrated Tier 7 AI Examination with local vision models
 python -m matazero analyze suspect.jpg -a --ollama llama3.2-vision
+
+# 7. Forensic Image Comparison & Tampering Diff (Metadata, DQT, Perceptual Hashes, Pixel SSIM)
+python -m matazero diff photo1.jpg photo2.jpg -a
+
+# 8. Deep Steganography & Multi-Channel Bitplane Slicing (Planes 0-7, Chi-Square PoV Test)
+python -m matazero stego suspect.png -a --save-bitplanes ./bitplane_slices
+
+# 9. Case Chronological Timeline & Camera Clock Drift Reconstruction (Plaso/Timesketch & CSV)
+python -m matazero timeline ./case_images/ -a -r -f plaso -o timeline_plaso.csv
+
+# 10. Multi-Image Dataset Clustering & Fleet Outlier Detection
+python -m matazero cluster ./evidence_vault/ -a --by camera
+
+# 11. Extract and Carve Hidden MP4 Video from Samsung / Google Motion Photos
+python -m matazero motion motion_photo.jpg -c -o ./extracted_video.mp4
+
+# 12. Forensic Geolocation: Coordinates, reverse geocoding, solar angles & map links
+python -m matazero locate photo.jpg -a
+
+# 13. Multi-image spatial relation, geodesic distance, velocity & travel anomaly check
+python -m matazero locate photo1.jpg photo2.jpg -a
+
+# 14. Generate an interactive standalone Leaflet / OpenStreetMap HTML dossier map
+python -m matazero locate ./case_photos -a -r -f html -o dossier_map.html
+
+# 15. Export RFC 7946 GeoJSON FeatureCollection with trajectory LineStrings for GIS/QGIS
+python -m matazero locate ./case_photos -a -r -f geojson -o case_evidence.geojson
+
+# 16. Extract all embedded slide images, speaker notes, and metadata from Office documents (.docx, .pptx)
+python -m matazero extract presentation.pptx -a -o ./extracted_presentation_media
+
+# 17. Extract all embedded artefacts, previews, metadata streams, and trailing payloads
+python -m matazero extract photo.jpg -o ./extracted_assets -a
+
+# 18. Extract a region crop and pixel color at specific -x, -y coordinates
+python -m matazero extract photo.jpg -x 150 -y 200 -w 300 -h 300 -o ./crops
+
+# 19. Complex batch query: recursive directory scan, filtered by GPS, with 8 worker threads
+python -m matazero analyze ./evidence_drive -a -r --glob "*.jpg" --filter "has_gps" -j 8 -f json -o results.json
+
+# 20. Probe container segments and metadata tag/value byte locations
+python -m matazero probe photo.jpg
+
+# 21. Index Evidence Library into a Queryable SQLite Database for SQL Analytics
+python -m matazero export sqlite ./case_images/ -a -r -o ./case_vault.db
+
+# 22. Generate STIX 2.1 Threat Intelligence Bundle with Cyber Observable & Indicator Objects
+python -m matazero export stix ./malicious_evidence/ -a -o ./threat_bundle.json
+
+# 23. Learn a new camera hardware fingerprint from a reference shot
+python -m matazero corpus learn ref_shot.jpg -i canon_r5 -m "Canon EOS R5" -e "DIGIC X Hardware ISP"
+
+# 24. Create an authorization scope for forensic custody
+python -m matazero scope create -c "CASE-2026-01" -p "Forensic Ingest" -l "Warrant" -a "Lead Investigator" -o scope.json
+python -m matazero scope validate scope.json
+
+# 25. Run scoped analysis under legal custody
+python -m matazero analyze evidence.jpg -s scope.json
+
+# 26. Verify audit log tamper-resistance
+python -m matazero audit verify ./audit.jsonl
+
+# 27. Losslessly strip metadata while preserving raw pixel streams
+python -m matazero clean photo.jpg -o cleaned.jpg -c
 ```
 
 ---
