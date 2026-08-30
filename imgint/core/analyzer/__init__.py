@@ -6,6 +6,9 @@ from imgint.core.analyzer.tier4_hash import HashingAnalyzer
 from imgint.core.analyzer.tier5_geotime import GeoTimeAnalyzer
 from imgint.core.analyzer.tier6_indicators import IndicatorsAnalyzer
 from imgint.core.analyzer.tier7_content import ContentAnalyzer
+from imgint.core.analyzer.ghost import JpegGhostDetector
+from imgint.core.analyzer.cfa import CfaDemosaicAnalyzer
+from imgint.core.analyzer.copymove import CopyMoveDetector
 
 
 def create_default_analyzer_registry() -> AnalyzerRegistry:
@@ -25,5 +28,8 @@ __all__ = [
     "GeoTimeAnalyzer",
     "IndicatorsAnalyzer",
     "ContentAnalyzer",
+    "JpegGhostDetector",
+    "CfaDemosaicAnalyzer",
+    "CopyMoveDetector",
     "create_default_analyzer_registry",
 ]

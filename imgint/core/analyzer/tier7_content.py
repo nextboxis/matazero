@@ -28,7 +28,16 @@ class ContentAnalyzer(Analyzer):
         diagnostics: List[Diagnostic] = []
 
         sandbox_res = SandboxRunner.run_decode_tasks(
-            ctx.file_path, tasks=["dimensions", "dominant_colors", "entropy", "fft_frequency"]
+            ctx.file_path,
+            tasks=[
+                "dimensions",
+                "dominant_colors",
+                "entropy",
+                "fft_frequency",
+                "ghost",
+                "cfa",
+                "copymove",
+            ],
         )
 
         if not sandbox_res.get("success"):
@@ -106,6 +115,62 @@ class ContentAnalyzer(Analyzer):
                         "generative AI upsampling checkerboard grid patterns or regular geometric screen moiré."
                     ),
                     provenance=Provenance(source_layer="sandbox", extractor="sandboxed_fft_analyzer"),
+                )
+            )
+
+        # JPEG Ghost & Double Compression Splicing Analysis
+        if "ghost" in tasks:
+            ghost_data = tasks["ghost"]
+            findings.append(
+                Finding(
+                    name="jpeg_ghost_splicing_analysis",
+                    value=ghost_data,
+                    tier=7,
+                    extractor="sandboxed_ghost_analyzer",
+                    confidence=Confidence.DERIVED,
+                    caveat=(
+                        "JPEG Ghost evaluation computes localized compression error surfaces. Multi-modal quality variance "
+                        "indicates composite image splicing from a different JPEG donor source."
+                    ),
+                    provenance=Provenance(source_layer="sandbox", extractor="sandboxed_ghost_analyzer"),
+                )
+            )
+
+        # CFA (Color Filter Array) Bayer Demosaicing Inconsistency Analysis
+        if "cfa" in tasks:
+            cfa_data = tasks["cfa"]
+            is_hw = cfa_data.get("is_hardware_sensor_consistent", False)
+            findings.append(
+                Finding(
+                    name="cfa_bayer_demosaicing_analysis",
+                    value=cfa_data,
+                    tier=7,
+                    extractor="sandboxed_cfa_analyzer",
+                    confidence=Confidence.OBSERVED if is_hw else Confidence.INDICATIVE,
+                    caveat=(
+                        "CFA Bayer analysis measures second-order green channel interpolation covariance. Physical camera "
+                        "sensors produce periodic demosaicing patterns, whereas synthetic AI images and digital paintings lack them."
+                    ),
+                    provenance=Provenance(source_layer="sandbox", extractor="sandboxed_cfa_analyzer"),
+                )
+            )
+
+        # Copy-Move & Clone-Stamp Forgery Detection
+        if "copymove" in tasks:
+            copymove_data = tasks["copymove"]
+            is_cloned = copymove_data.get("copy_move_detected", False)
+            findings.append(
+                Finding(
+                    name="copymove_cloning_analysis",
+                    value=copymove_data,
+                    tier=7,
+                    extractor="sandboxed_copymove_detector",
+                    confidence=Confidence.DERIVED if is_cloned else Confidence.OBSERVED,
+                    caveat=(
+                        "Copy-move detector clusters matching spatial block feature vectors. Identical shift vector clusters "
+                        "indicate deliberate clone-stamping or object duplication."
+                    ),
+                    provenance=Provenance(source_layer="sandbox", extractor="sandboxed_copymove_detector"),
                 )
             )
 

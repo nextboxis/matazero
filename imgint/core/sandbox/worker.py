@@ -179,6 +179,18 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
                     "estimated_ssim": round(max(0.0, 1.0 - (mse / (255.0 ** 2))), 4),
                 }
 
+        if "ghost" in tasks:
+            from imgint.core.analyzer.ghost import JpegGhostDetector
+            results["tasks"]["ghost"] = JpegGhostDetector.analyze(img_rgb)
+
+        if "cfa" in tasks:
+            from imgint.core.analyzer.cfa import CfaDemosaicAnalyzer
+            results["tasks"]["cfa"] = CfaDemosaicAnalyzer.analyze(img_rgb)
+
+        if "copymove" in tasks:
+            from imgint.core.analyzer.copymove import CopyMoveDetector
+            results["tasks"]["copymove"] = CopyMoveDetector.analyze(img_rgb)
+
         if "crop" in tasks:
             x = int(input_data.get("x", 0))
             y = int(input_data.get("y", 0))
