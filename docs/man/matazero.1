@@ -1,0 +1,189 @@
+﻿.\" Manpage for matazero
+.TH MATAZERO 1 "August 2026" "matazero 0.1.0" "User Commands"
+.SH NAME
+matazero \- Image Intelligence Toolkit for Ethical OSINT and Digital Forensics
+
+.SH SYNOPSIS
+.B matazero
+[\fICOMMAND\fR] [\fIOPTIONS\fR] [\fIARGS...\fR]
+.br
+.B mata
+[\fICOMMAND\fR] [\fIOPTIONS\fR] [\fIARGS...\fR]
+.br
+.B imgint
+[\fICOMMAND\fR] [\fIOPTIONS\fR] [\fIARGS...\fR]
+
+.SH DESCRIPTION
+.B matazero
+is a courtroom-grade, offline-first digital image forensics and ethical open-source intelligence (OSINT) analysis suite. It implements a 7-tier extraction pipeline to inspect image container structures, hardware encoder quantization tables (DQT/DHT), embedded payloads, chronological timelines, spatial reverse-geocoding, steganography, JPEG ghost slicing, CFA Bayer demosaicing artifacts, copy-move cloning, and local Ollama-based AI vision examination.
+
+The tool operates strictly air-gapped with zero telemetry and contains hardcoded refusal logic against biometric facial recognition and bulk scraping.
+
+.SH COMMANDS
+.TP
+.B analyze \fITARGETS...\fR
+Run 7 forensic extraction tiers over image files or directories.
+.TP
+.B ask \fITARGET QUESTION\fR
+Interrogate an evidence image using your local Ollama vision model (100% offline).
+.TP
+.B model list
+Discover and inspect local vision models available in your Ollama daemon.
+.TP
+.B diff \fIIMAGE1 IMAGE2\fR
+Forensic comparison between two images (structural units, metadata delta, DQT tables, and pixel SSIM).
+.TP
+.B stego \fITARGET\fR
+Deep steganography analysis, multi-channel bitplane slicing (planes 0-7), and Chi-Square Pair-of-Values test.
+.TP
+.B timeline \fITARGETS...\fR
+Reconstruct chronological timelines across multiple files with camera clock drift estimation and Plaso/Timesketch export.
+.TP
+.B motion \fITARGET\fR
+Detect and carve embedded MP4/HEVC video streams from Motion and Live Photos (Samsung, Pixel, Apple).
+.TP
+.B cluster \fITARGETS...\fR
+Group evidence files by camera fleet, DQT quantization tables, GPS proximity, or visual similarity, with anomaly/outlier triage.
+.TP
+.B export \fITARGETS...\fR
+Export forensic findings to a relational SQLite database or STIX 2.1 Threat Intelligence Bundle.
+.TP
+.B locate \fITARGETS...\fR
+Forensic geolocation, reverse geocoding, NOAA solar chronolocation, and Leaflet/GeoJSON/GPX map export.
+.TP
+.B extract \fITARGET\fR
+Extract embedded thumbnails, preview streams, metadata blocks, and trailing payloads.
+.TP
+.B probe \fITARGET\fR
+Dump container segment and chunk structure with absolute byte offsets.
+.TP
+.B clean \fITARGET\fR
+Losslessly strip metadata while preserving raw pixel streams.
+.TP
+.B scope \fI[create|validate|show]\fR
+Manage cryptographically signed HMAC-SHA256 authorization scopes for chain-of-custody.
+.TP
+.B skill \fI[list|info]\fR
+Manage and inspect dynamically loaded external forensic skills and microkernel plugins.
+.TP
+.B audit \fI[verify|export]\fR
+Verify the tamper-evident SHA-256 hash-chained audit log.
+.TP
+.B corpus \fI[list|learn|info]\fR
+Manage and train reference camera encoder quantization fingerprints.
+
+.SH OPTIONS
+.TP
+.BR \-s ", " \-\-scope " \fIPATH\fR"
+Path to authorization scope JSON file for legal chain-of-custody.
+.TP
+.BR \-a ", " \-\-self\-audit
+Operate in self-audit mode on personal files without an external scope.
+.TP
+.BR \-t ", " \-\-tiers " \fILIST\fR"
+Comma-separated tier list to execute (e.g. \fB1,2,3,4,7\fR).
+.TP
+.BR \-f ", " \-\-format " \fIFORMAT\fR"
+Output format: \fBreport\fR, \fBdashboard\fR, \fBdeep\fR, \fBsummary\fR, \fBtext\fR, \fBjson\fR, \fBndjson\fR, \fBtable\fR, \fBhtml\fR, \fBgeojson\fR, \fBgpx\fR.
+.TP
+.BR \-o ", " \-\-out " \fIPATH\fR"
+Write output to specified file path instead of standard output.
+.TP
+.BR \-r ", " \-\-recursive
+Recursively search directories for image evidence files.
+.TP
+.BR \-j ", " \-\-jobs " \fINUM\fR"
+Number of concurrent worker threads (default: 1).
+.TP
+.BR \-c ", " \-\-carve
+Automatically carve trailing archives, payloads, and embedded video streams.
+.TP
+.BR \-\-ollama " \fIMODEL\fR"
+Enable local Ollama vision model inspection in Tier 7 (e.g. \fBllama3.2-vision\fR, \fBmoondream\fR).
+.TP
+.BR \-\-deep ", " \-\-details
+Display exhaustive hierarchical forensic tree breakdown.
+.TP
+.BR \-\-summary
+Display executive visual summary dashboard.
+.TP
+.BR \-\-filter " \fIEXPR\fR"
+Filter records by condition (e.g. \fBhas_gps\fR, \fBhas_payload\fR, \fBauthentic=false\fR).
+.TP
+.BR \-\-version
+Show program version and exit.
+.TP
+.BR \-\-help
+Show help message and exit.
+
+.SH EXIT STATUS
+.TP
+.B 0
+Success: Analysis completed cleanly.
+.TP
+.B 1
+Runtime Error: Unhandled execution exception.
+.TP
+.B 2
+Usage Error: Invalid CLI flags or syntax.
+.TP
+.B 3
+Unsupported Format: Magic bytes not recognized.
+.TP
+.B 4
+Partial Success: Completed with non-fatal diagnostics.
+.TP
+.B 5
+Budget Exceeded: Resource, unit count, or depth safety limit exceeded.
+.TP
+.B 6
+Authorization Failure: Missing, invalid, or expired authorization scope.
+.TP
+.B 7
+Custody Failure: Evidence hash mismatch or broken audit hash chain.
+
+.SH FORENSIC STANDARDS & GUARANTEES
+.TP
+.B 100% Offline & Air-Gapped
+Zero telemetry, zero external network queries, and evidence never leaves the local host.
+.TP
+.B Zero Biometric Surveillance
+Refuses facial recognition, bulk scraping, or identity profiling.
+.TP
+.B Cryptographic Chain-of-Custody
+SHA-256 hash-chained audit logging and HMAC-SHA256 signed legal authorization scopes.
+.TP
+.B Deterministic Verdicts
+Outputs verifiable authenticity ratings (\fBAUTHENTIC_CAMERA_CAPTURE\fR, \fBTAMPERED_TRAILING_PAYLOAD\fR, \fBAI_SYNTHETIC_GENERATION\fR, \fBUNVERIFIED_METADATA_STRIPPED\fR) with mandatory confidence ratings and caveats.
+
+.SH EXAMPLES
+.TP
+.B 1. Full 7-tier deep forensic analysis:
+matazero analyze evidence.jpg \-a \-\-deep
+.TP
+.B 2. Interrogate evidence with local Ollama vision AI:
+matazero ask crime_scene.jpg "What make and model is that vehicle?"
+.TP
+.B 3. Compare two images for tampering and pixel SSIM delta:
+matazero diff original.jpg suspect.jpg \-f table
+.TP
+.B 4. Inspect LSB bitplanes and Chi-Square steganography:
+matazero stego suspect.png \-f table
+.TP
+.B 5. Cluster 10,000 photos by camera fleet and detect outliers:
+matazero cluster ./evidence_vault/ \-a \-r \-k camera \-\-outliers
+.TP
+.B 6. Export case evidence to relational SQLite:
+matazero export ./case_evidence \-a \-r \-t sqlite \-o case.db
+.TP
+.B 7. Reconstruct case timeline and estimate camera clock drift:
+matazero timeline ./case_photos \-a \-r \-f plaso \-o timeline.jsonl
+
+.SH SEE ALSO
+.BR exiftool (1),
+.BR binwalk (1),
+.BR plaso (1),
+.BR ollama (1)
+
+.SH AUTHOR
+Developed by the matazero contributors. Distributed under the Apache 2.0 License.
