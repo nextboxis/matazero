@@ -138,6 +138,33 @@ python matazero.py --help
 
 ---
 
+### 🐧 Setting up Local AI Vision on Kali Linux (Ollama)
+
+To enable 100% offline local AI visual interrogation (`matazero ask`) and Tier 7 AI inspection (`matazero analyze --ollama`) on **Kali Linux** or any Debian/Ubuntu-based distribution:
+
+```bash
+# 1. Install Ollama on Kali Linux
+curl -fsSL https://ollama.com/install.sh | sh
+
+# 2. Verify the Ollama daemon is running
+systemctl status ollama
+# (If not using systemd, start it manually: ollama serve)
+
+# 3. Pull recommended local vision models
+ollama pull llama3.2-vision    # High-accuracy vision model (~4.0 GB)
+ollama pull moondream          # Ultra-lightweight, fast vision model (~1.8 GB)
+ollama pull llava              # Standard multimodal model (~4.5 GB)
+
+# 4. Verify model availability with matazero
+matazero model list
+
+# 5. Interrogate evidence photos on Kali Linux
+matazero ask evidence.jpg "Transcribe all visible license plates and street names"
+matazero analyze evidence.jpg -a --ollama llama3.2-vision
+```
+
+---
+
 ## CLI Access & Global Aliases
 
 Once installed via `pip install -e .` or `pip install .`, the CLI registers three interchangeable global commands:
