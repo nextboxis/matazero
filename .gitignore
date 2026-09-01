@@ -39,10 +39,15 @@ coverage.xml
 
 # Runtime evidence, logs, and artifacts
 evidence_store/
+scratch/
 audit.jsonl
 cleaned.jpg
 *.html
+*.geojson
+*.kml
+*.kmz
 scope.json
+ip_sample.json
 
 # IDE & OS files
 .vscode/
