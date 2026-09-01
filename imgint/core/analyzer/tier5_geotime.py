@@ -41,21 +41,32 @@ class GeoTimeAnalyzer(Analyzer):
         findings: List[Finding] = []
         diagnostics: List[Diagnostic] = []
 
-        lat_raw = ctx.get_field_value("GPSLatitude")
-        lat_ref = ctx.get_field_value("GPSLatitudeRef") or "N"
-        lon_raw = ctx.get_field_value("GPSLongitude")
-        lon_ref = ctx.get_field_value("GPSLongitudeRef") or "E"
-        alt_raw = ctx.get_field_value("GPSAltitude")
-        alt_ref = ctx.get_field_value("GPSAltitudeRef")
-        dop_raw = ctx.get_field_value("GPSDOP")
-        gps_date = ctx.get_field_value("GPSDateStamp")
-        gps_time = ctx.get_field_value("GPSTimeStamp")
-        gps_satellites = ctx.get_field_value("GPSSatellites")
-        gps_status = ctx.get_field_value("GPSStatus")
-        gps_measure_mode = ctx.get_field_value("GPSMeasureMode")
-        gps_diff = ctx.get_field_value("GPSDifferential")
-        gps_img_dir = ctx.get_field_value("GPSImgDirection")
-        gps_img_dir_ref = ctx.get_field_value("GPSImgDirectionRef") or "T"
+        lat_field = ctx.get_field("GPSInfo:GPSLatitude") or ctx.get_field("GPSLatitude")
+        lat_ref_field = ctx.get_field("GPSInfo:GPSLatitudeRef") or ctx.get_field("GPSLatitudeRef")
+        lon_field = ctx.get_field("GPSInfo:GPSLongitude") or ctx.get_field("GPSLongitude")
+        lon_ref_field = ctx.get_field("GPSInfo:GPSLongitudeRef") or ctx.get_field("GPSLongitudeRef")
+
+        lat_raw = lat_field.value if lat_field else None
+        lat_ref = str(lat_ref_field.value).strip().upper() if lat_ref_field and lat_ref_field.value else "N"
+        if lat_ref not in ("N", "S"):
+            lat_ref = "N"
+
+        lon_raw = lon_field.value if lon_field else None
+        lon_ref = str(lon_ref_field.value).strip().upper() if lon_ref_field and lon_ref_field.value else "E"
+        if lon_ref not in ("E", "W"):
+            lon_ref = "E"
+
+        alt_raw = ctx.get_field_value("GPSInfo:GPSAltitude") or ctx.get_field_value("GPSAltitude")
+        alt_ref = ctx.get_field_value("GPSInfo:GPSAltitudeRef") or ctx.get_field_value("GPSAltitudeRef")
+        dop_raw = ctx.get_field_value("GPSInfo:GPSDOP") or ctx.get_field_value("GPSDOP")
+        gps_date = ctx.get_field_value("GPSInfo:GPSDateStamp") or ctx.get_field_value("GPSDateStamp")
+        gps_time = ctx.get_field_value("GPSInfo:GPSTimeStamp") or ctx.get_field_value("GPSTimeStamp")
+        gps_satellites = ctx.get_field_value("GPSInfo:GPSSatellites") or ctx.get_field_value("GPSSatellites")
+        gps_status = ctx.get_field_value("GPSInfo:GPSStatus") or ctx.get_field_value("GPSStatus")
+        gps_measure_mode = ctx.get_field_value("GPSInfo:GPSMeasureMode") or ctx.get_field_value("GPSMeasureMode")
+        gps_diff = ctx.get_field_value("GPSInfo:GPSDifferential") or ctx.get_field_value("GPSDifferential")
+        gps_img_dir = ctx.get_field_value("GPSInfo:GPSImgDirection") or ctx.get_field_value("GPSImgDirection")
+        gps_img_dir_ref = ctx.get_field_value("GPSInfo:GPSImgDirectionRef") or ctx.get_field_value("GPSImgDirectionRef") or "T"
         focal_len_raw = ctx.get_field_value("FocalLength")
         focal_len_35_raw = ctx.get_field_value("FocalLengthIn35mmFilm")
         date_orig = ctx.get_field_value("DateTimeOriginal") or ctx.get_field_value("DateTime")

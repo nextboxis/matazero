@@ -56,7 +56,12 @@ EXIF_TAGS = {
     0xA433: "LensMake",
     0xA434: "LensModel",
     0xA435: "LensSerialNumber",
-    # GPS IFD 0x8825
+    # IFD1 (Thumbnail)
+    0x0201: "JPEGInterchangeFormat",
+    0x0202: "JPEGInterchangeFormatLength",
+}
+
+GPS_TAGS = {
     0x0000: "GPSVersionID",
     0x0001: "GPSLatitudeRef",
     0x0002: "GPSLatitude",
@@ -71,12 +76,22 @@ EXIF_TAGS = {
     0x000B: "GPSDOP",
     0x000C: "GPSSpeedRef",
     0x000D: "GPSSpeed",
+    0x000E: "GPSTrackRef",
+    0x000F: "GPSTrack",
+    0x0010: "GPSImgDirectionRef",
+    0x0011: "GPSImgDirection",
     0x0012: "GPSMapDatum",
     0x001D: "GPSDateStamp",
     0x001E: "GPSDifferential",
-    # IFD1 (Thumbnail)
-    0x0201: "JPEGInterchangeFormat",
-    0x0202: "JPEGInterchangeFormatLength",
+    0x001F: "GPSHPositioningError",
+}
+
+INTEROP_TAGS = {
+    0x0001: "InteroperabilityIndex",
+    0x0002: "InteroperabilityVersion",
+    0x1000: "RelatedImageFileFormat",
+    0x1001: "RelatedImageWidth",
+    0x1002: "RelatedImageLength",
 }
 
 
@@ -149,7 +164,13 @@ class ExifParser(BlockParser):
                 curr += 12
 
                 tag_hex = f"0x{tag_id:04X}"
-                tag_name = EXIF_TAGS.get(tag_id, f"Tag_{tag_hex}")
+                if ifd_name == "GPSInfo":
+                    tag_name = GPS_TAGS.get(tag_id, f"Tag_{tag_hex}")
+                elif ifd_name == "InteropIFD":
+                    tag_name = INTEROP_TAGS.get(tag_id, f"Tag_{tag_hex}")
+                else:
+                    tag_name = EXIF_TAGS.get(tag_id, f"Tag_{tag_hex}")
+
                 type_size = TYPE_SIZES.get(field_type, 1)
                 total_val_bytes = count * type_size
 
@@ -231,7 +252,15 @@ class ExifParser(BlockParser):
                         )
                     )
                     # Produce Tier-1 observed finding for prominent metadata tags
-                    if tag_id in (0x010F, 0x0110, 0x0131, 0x0132, 0x9003, 0x9004, 0xA434, 0x0002, 0x0004, 0x0006, 0x0007, 0x001D, 0x011A, 0x011B, 0xA002, 0xA003):
+                    should_emit_finding = False
+                    if ifd_name == "GPSInfo" and tag_id in (0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007, 0x001D):
+                        should_emit_finding = True
+                    elif ifd_name in ("IFD0", "ExifSubIFD") and tag_id in (
+                        0x010F, 0x0110, 0x0131, 0x0132, 0x9003, 0x9004, 0xA434, 0x011A, 0x011B, 0xA002, 0xA003
+                    ):
+                        should_emit_finding = True
+
+                    if should_emit_finding:
                         findings.append(
                             Finding(
                                 name=f"exif_{tag_name.lower()}",
