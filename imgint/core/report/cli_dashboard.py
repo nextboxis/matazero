@@ -111,28 +111,32 @@ class CliDashboard:
         solar_f = next((f.value for f in record.findings if f.name == "solar_chronolocation_claimed"), None)
 
         if gps_f and isinstance(gps_f, dict) and gps_f.get("latitude") is not None:
-            lat = gps_f.get("latitude")
-            lon = gps_f.get("longitude")
+            lat = float(gps_f.get("latitude"))
+            lon = float(gps_f.get("longitude"))
             place = gps_f.get("nearest_place") or gps_f.get("closest_city")
             country = gps_f.get("country") or gps_f.get("country_code")
             tz = gps_f.get("timezone")
             alt = gps_f.get("altitude_m") or gps_f.get("altitude_meters")
 
-            right_table.add_row("Coordinates (X,Y):", f"X={lon:.5f}° (Lon), Y={lat:.5f}° (Lat)")
-            if place:
-                right_table.add_row("Nearest City:", f"{place}, {country}" if country else str(place))
-            if tz:
-                right_table.add_row("Timezone:", str(tz))
-            if alt is not None:
-                right_table.add_row("Altitude:", f"{alt} meters")
-            if solar_f and isinstance(solar_f, dict):
-                phase = solar_f.get("day_phase", "Daylight")
-                el = solar_f.get("solar_elevation_degrees", 0.0)
-                az = solar_f.get("solar_azimuth_degrees", 0.0)
-                right_table.add_row("Solar Chrono:", f"{phase} (Elevation: {el}°, Azimuth: {az}°)")
+            if abs(lat) < 0.0001 and abs(lon) < 0.0001:
+                right_table.add_row("Coordinates (X,Y):", "[yellow]0.00000°, 0.00000° (Uninitialized GPS Lock / Null Island)[/yellow]")
+                right_table.add_row("Location:", "[dim]Geocoding suppressed (No satellite lock)[/dim]")
+            else:
+                right_table.add_row("Coordinates (X,Y):", f"X={lon:.5f}° (Lon), Y={lat:.5f}° (Lat)")
+                if place:
+                    right_table.add_row("Nearest City:", f"{place}, {country}" if country else str(place))
+                if tz:
+                    right_table.add_row("Timezone:", str(tz))
+                if alt is not None:
+                    right_table.add_row("Altitude:", f"{alt} meters")
+                if solar_f and isinstance(solar_f, dict):
+                    phase = solar_f.get("day_phase", "Daylight")
+                    el = solar_f.get("solar_elevation_degrees", 0.0)
+                    az = solar_f.get("solar_azimuth_degrees", 0.0)
+                    right_table.add_row("Solar Chrono:", f"{phase} (Elevation: {el}°, Azimuth: {az}°)")
 
-            maps_url = f"https://www.openstreetmap.org/?mlat={lat:.5f}&mlon={lon:.5f}#map=16/{lat:.5f}/{lon:.5f}"
-            right_table.add_row("Map Link:", f"[link={maps_url}]{maps_url}[/link]")
+                maps_url = f"https://www.openstreetmap.org/?mlat={lat:.5f}&mlon={lon:.5f}#map=16/{lat:.5f}/{lon:.5f}"
+                right_table.add_row("Map Link:", f"[link={maps_url}]{maps_url}[/link]")
         else:
             right_table.add_row("GPS Coordinates:", "[dim]No geolocation metadata found in container[/dim]")
             right_table.add_row("Chronolocation:", "[dim]No solar angle data available[/dim]")

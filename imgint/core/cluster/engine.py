@@ -1,4 +1,4 @@
-﻿"""Clustering engine for evidence grouping and outlier detection."""
+"""Clustering engine for evidence grouping and outlier detection."""
 
 from __future__ import annotations
 import hashlib
@@ -136,14 +136,20 @@ class ClusterEngine:
                 dqt_bytes.extend(u.payload)
         dqt_hash = hashlib.md5(dqt_bytes).hexdigest()[:8] if dqt_bytes else "no_dqt"
 
-        # GPS
+        # GPS (Sanitized against bounds and Null Island)
         coords = None
-        gps_finding = next((f for f in rec.findings if f.name == "gps_coordinates_claimed"), None)
+        gps_finding = next((f for f in rec.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
         if gps_finding and isinstance(gps_finding.value, dict):
             lat = gps_finding.value.get("latitude")
             lon = gps_finding.value.get("longitude")
             if lat is not None and lon is not None:
-                coords = (lat, lon)
+                try:
+                    f_lat, f_lon = float(lat), float(lon)
+                    if -90.0 <= f_lat <= 90.0 and -180.0 <= f_lon <= 180.0:
+                        if not (abs(f_lat) < 0.0001 and abs(f_lon) < 0.0001):
+                            coords = (f_lat, f_lon)
+                except Exception:
+                    pass
 
         # Perceptual hash
         phash_f = next((f.value for f in rec.findings if f.name == "perceptual_hashes" and isinstance(f.value, dict)), {})

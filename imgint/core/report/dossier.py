@@ -52,9 +52,8 @@ class CaseDossierGenerator:
                 badge_class = "badge-unverified"
                 badge_text = "Stripped / Inconclusive"
 
-            # Check GPS
-            lat_f = next((f for f in rec.fields if "Latitude" in f.name and "Ref" not in f.name), None)
-            lon_f = next((f for f in rec.fields if "Longitude" in f.name and "Ref" not in f.name), None)
+            # Check GPS from verified findings
+            gps_f = next((f for f in rec.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
             time_f = next((f for f in rec.fields if "DateTime" in f.name), None)
             make_f = next((f for f in rec.fields if f.name == "Make"), None)
             model_f = next((f for f in rec.fields if f.name == "Model"), None)
@@ -64,12 +63,20 @@ class CaseDossierGenerator:
 
             lat_val = None
             lon_val = None
-            if lat_f and lon_f:
-                try:
-                    lat_val = float(lat_f.value) if isinstance(lat_f.value, (int, float)) else None
-                    lon_val = float(lon_f.value) if isinstance(lon_f.value, (int, float)) else None
-                except Exception:
-                    pass
+            if gps_f and isinstance(gps_f.value, dict):
+                raw_lat = gps_f.value.get("latitude")
+                raw_lon = gps_f.value.get("longitude")
+                if raw_lat is not None and raw_lon is not None:
+                    try:
+                        fl_lat = float(raw_lat)
+                        fl_lon = float(raw_lon)
+                        # Sanitize: bounds and Null Island check
+                        if -90.0 <= fl_lat <= 90.0 and -180.0 <= fl_lon <= 180.0:
+                            if not (abs(fl_lat) < 0.0001 and abs(fl_lon) < 0.0001):
+                                lat_val = fl_lat
+                                lon_val = fl_lon
+                    except Exception:
+                        pass
 
             f_name = html.escape(Path(rec.file_path).name if rec.file_path else "evidence")
             safe_badge_text = html.escape(badge_text)

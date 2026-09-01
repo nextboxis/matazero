@@ -574,27 +574,41 @@ class GeoTimeAnalyzer(Analyzer):
         return findings, diagnostics
 
     def _convert_dms_to_decimal(self, dms_raw: Any, ref: str) -> float:
-        if isinstance(dms_raw, (int, float)):
-            val = float(dms_raw)
-            if ref in ("S", "W"):
-                val = -val
-            return val
+        if not dms_raw:
+            return None
 
-        if isinstance(dms_raw, (list, tuple)) and len(dms_raw) >= 3:
-            deg = self._convert_rational_to_float(dms_raw[0])
-            mins = self._convert_rational_to_float(dms_raw[1])
-            secs = self._convert_rational_to_float(dms_raw[2])
-            dec = deg + (mins / 60.0) + (secs / 3600.0)
-            if ref in ("S", "W"):
-                dec = -dec
-            return dec
-        raise ValueError(f"Unrecognized DMS structure {dms_raw}")
+        try:
+            if isinstance(dms_raw, (int, float)):
+                val = float(dms_raw)
+                if ref in ("S", "W"):
+                    val = -val
+                return val
 
-    def _convert_rational_to_float(self, val: Any) -> float:
-        if isinstance(val, (list, tuple)) and len(val) == 2:
-            num, den = val
-            return float(num) / float(den) if den != 0 else float(num)
-        return float(val)
+            if isinstance(dms_raw, (list, tuple)) and len(dms_raw) >= 3:
+                deg = self._convert_rational_to_float(dms_raw[0])
+                mins = self._convert_rational_to_float(dms_raw[1])
+                secs = self._convert_rational_to_float(dms_raw[2])
+                if deg is None or mins is None or secs is None:
+                    return None
+                dec = deg + (mins / 60.0) + (secs / 3600.0)
+                if ref in ("S", "W"):
+                    dec = -dec
+                return dec
+        except Exception:
+            return None
+
+        return None
+
+    def _convert_rational_to_float(self, val: Any) -> Optional[float]:
+        if val is None:
+            return None
+        try:
+            if isinstance(val, (list, tuple)) and len(val) == 2:
+                num, den = val
+                return float(num) / float(den) if den != 0 else float(num)
+            return float(val)
+        except Exception:
+            return None
 
     def _offline_reverse_geocode(self, lat: float, lon: float) -> Optional[Dict[str, Any]]:
         return GeoLocator.reverse_geocode_offline(lat, lon)

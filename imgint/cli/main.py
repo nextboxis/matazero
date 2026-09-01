@@ -644,22 +644,29 @@ def locate(
 
             # Optical viewing cone & camera sightline
             try:
-                img_dir_f = ctx.get_field_value("GPSImgDirection")
-                if img_dir_f is not None:
-                    gta = GeoTimeAnalyzer()
-                    img_dir_v = gta._convert_rational_to_float(img_dir_f)
-                    f_mm_v = gta._convert_rational_to_float(ctx.get_field_value("FocalLength")) if ctx.get_field_value("FocalLength") else None
-                    f_35_v = gta._convert_rational_to_float(ctx.get_field_value("FocalLengthIn35mmFilm")) if ctx.get_field_value("FocalLengthIn35mmFilm") else None
-                    from imgint.core.geo.optical import OpticalRayCaster
-                    cone = OpticalRayCaster.calculate_viewing_cone(
-                        lat=lat,
-                        lon=lon,
-                        heading_deg=img_dir_v,
-                        heading_ref=str(ctx.get_field_value("GPSImgDirectionRef") or "T"),
-                        focal_length_35mm=f_35_v,
-                        focal_length_mm=f_mm_v,
-                    )
-                    point_record["optical_viewing_cone"] = cone.to_dict()
+                cone_finding = next((f for f in rec.findings if f.name == "optical_viewing_cone"), None)
+                if cone_finding and isinstance(cone_finding.value, dict):
+                    point_record["optical_viewing_cone"] = cone_finding.value
+                else:
+                    img_dir_f = next((f.value for f in rec.fields if f.name == "GPSImgDirection"), None)
+                    if img_dir_f is not None:
+                        gta = GeoTimeAnalyzer()
+                        img_dir_v = gta._convert_rational_to_float(img_dir_f)
+                        fl_val = next((f.value for f in rec.fields if f.name == "FocalLength"), None)
+                        fl35_val = next((f.value for f in rec.fields if f.name == "FocalLengthIn35mmFilm"), None)
+                        f_mm_v = gta._convert_rational_to_float(fl_val) if fl_val else None
+                        f_35_v = gta._convert_rational_to_float(fl35_val) if fl35_val else None
+                        dir_ref = str(next((f.value for f in rec.fields if f.name == "GPSImgDirectionRef"), "T") or "T")
+                        from imgint.core.geo.optical import OpticalRayCaster
+                        cone = OpticalRayCaster.calculate_viewing_cone(
+                            lat=lat,
+                            lon=lon,
+                            heading_deg=img_dir_v,
+                            heading_ref=dir_ref,
+                            focal_length_35mm=f_35_v,
+                            focal_length_mm=f_mm_v,
+                        )
+                        point_record["optical_viewing_cone"] = cone.to_dict()
             except Exception:
                 pass
 

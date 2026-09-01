@@ -207,14 +207,20 @@ class TimelineReconstructor:
                 dt_utc = dt_primary if dt_primary.tzinfo else dt_primary.replace(tzinfo=timezone.utc)
                 drift_seconds = round((dt_utc - gps_satellite_dt).total_seconds(), 2)
 
-        # 3. GPS Coordinates
-        gps_finding = next((f for f in rec.findings if f.name == "gps_coordinates_claimed"), None)
+        # 3. GPS Coordinates (Sanitized against bounds and Null Island)
+        gps_finding = next((f for f in rec.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
         coords = None
         if gps_finding and isinstance(gps_finding.value, dict):
             lat = gps_finding.value.get("latitude")
             lon = gps_finding.value.get("longitude")
             if lat is not None and lon is not None:
-                coords = (lat, lon)
+                try:
+                    f_lat, f_lon = float(lat), float(lon)
+                    if -90.0 <= f_lat <= 90.0 and -180.0 <= f_lon <= 180.0:
+                        if not (abs(f_lat) < 0.0001 and abs(f_lon) < 0.0001):
+                            coords = (f_lat, f_lon)
+                except Exception:
+                    pass
 
         make = str(f_map.get("Make")) if f_map.get("Make") else None
         model = str(f_map.get("Model")) if f_map.get("Model") else None
