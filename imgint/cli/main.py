@@ -34,6 +34,8 @@ from imgint.core.fingerprint.dqt import DqtExtractor
 from imgint.core.fingerprint.subsampling import SubsamplingExtractor
 from imgint.core.fingerprint.order import SegmentOrderExtractor
 from imgint.core.geo.locator import GeoLocator
+from imgint.core.geo.sqlite_engine import NaturalEarthDB
+from imgint.core.geo.ndjson_ingester import NDJSONGeoIngester
 from imgint.core.geo.exporter import GeoExporter
 from imgint.core.report.cli_dashboard import CliDashboard
 from imgint.core.diff import ForensicComparator, DiffRenderer
@@ -395,6 +397,10 @@ def analyze(
 @click.option("--glob", "glob_pattern", default=None, help="Glob pattern to filter files (e.g. '*.jpg')")
 @click.option("-s", "--scope", "scope_path", default=lambda: os.environ.get("IMGINT_SCOPE"), help="Path to authorization scope JSON")
 @click.option("-a", "--self-audit", is_flag=True, help="Operate in self-audit mode without an external scope")
+@click.option("--geofence", "geofence_path", default=None, type=click.Path(exists=True), help="Path to GeoJSON file defining Area of Interest (AOI) / Geofence")
+@click.option("--ip", "ip_query", default=None, help="Correlate image GPS with an IP address (e.g. 24.48.0.1, requires network or --ip-geo)")
+@click.option("--ip-geo", "ip_geo_input", default=None, help="Path to IP Geolocation JSON file or raw JSON string")
+@click.option("--sqlite", "sqlite_path", default=None, type=click.Path(exists=True), help="Path to Natural Earth Vector SQLite database")
 def locate(
     targets: List[str],
     out_file: Optional[str],
@@ -404,8 +410,16 @@ def locate(
     glob_pattern: Optional[str],
     scope_path: Optional[str],
     self_audit: bool,
+    geofence_path: Optional[str],
+    ip_query: Optional[str],
+    ip_geo_input: Optional[str],
+    sqlite_path: Optional[str],
 ) -> None:
     """Forensic Geolocation, Reverse Geocoding, Solar Chronolocation, and Trajectory Intelligence."""
+    # Initialize custom SQLite database if explicitly passed
+    if sqlite_path:
+        NaturalEarthDB.get_instance(db_path=sqlite_path)
+
     # Scope resolution
     auth_scope = resolve_scope(scope_path, self_audit, require_scope=False, err_console=err_console)
 
@@ -413,6 +427,15 @@ def locate(
     if not resolved_targets:
         err_console.print("[yellow]No matching image files found to locate.[/yellow]")
         return
+
+    # Resolve IP Geolocation if provided
+    ip_geo_data: Optional[Dict[str, Any]] = None
+    if ip_geo_input:
+        ip_geo_data = GeoLocator.parse_ip_geolocation(ip_geo_input)
+    elif ip_query and allow_network:
+        ip_geo_data = GeoLocator.resolve_ip_online(ip_query)
+    elif ip_query and not allow_network:
+        err_console.print("[yellow]Notice: Online IP resolution requires --allow-network (-n). Use --ip-geo to provide offline JSON.[/yellow]")
 
     pipeline = AnalysisPipeline(scope=auth_scope, allow_network=allow_network, selected_tiers={1, 5})
 
@@ -500,6 +523,28 @@ def locate(
                 "solar_chronolocation": solar_info,
                 "map_links": map_links,
             }
+            # Facility proximity (airports, seaports)
+            try:
+                fac_ctx = GeoLocator.get_facility_context(lat, lon)
+                if fac_ctx.get("has_facility_proximity"):
+                    point_record["facility_proximity"] = fac_ctx
+            except Exception:
+                pass
+
+            if geofence_path:
+                try:
+                    gf_check = GeoLocator.is_point_in_geofence(val.get("latitude"), val.get("longitude"), geofence_path)
+                    point_record["geofence_status"] = "INSIDE" if gf_check.get("inside_geofence") else "BREACH / OUTSIDE"
+                    point_record["geofence_boundary"] = gf_check.get("matched_feature_name")
+                except Exception:
+                    pass
+            if ip_geo_data:
+                try:
+                    ip_corr = GeoLocator.correlate_gps_with_ip(val.get("latitude"), val.get("longitude"), ip_geo_data)
+                    if ip_corr:
+                        point_record["ip_correlation"] = ip_corr
+                except Exception:
+                    pass
             geo_points.append(point_record)
 
         except Exception as e:
@@ -559,9 +604,9 @@ def locate(
     # Format output
     rendered = ""
     if out_fmt == "geojson":
-        rendered = json.dumps(GeoExporter.to_geojson(geo_points), indent=2)
+        rendered = json.dumps(GeoExporter.to_geojson(geo_points, geofence_geojson=geofence_path), indent=2)
     elif out_fmt == "html":
-        rendered = GeoExporter.to_leaflet_html(geo_points)
+        rendered = GeoExporter.to_leaflet_html(geo_points, geofence_geojson=geofence_path)
     elif out_fmt == "gpx":
         rendered = GeoExporter.to_gpx(geo_points)
     elif out_fmt == "json":
@@ -583,6 +628,14 @@ def locate(
             lines.append(f"    Coordinates (X, Y):   X = {pt['x']}° (Lon), Y = {pt['y']}° (Lat)")
             if pt.get("altitude_m") is not None:
                 lines.append(f"    Altitude:             {pt['altitude_m']} meters")
+            if pt.get("geofence_status"):
+                lines.append(f"    Geofence Status:      {pt['geofence_status']} ({pt.get('geofence_boundary', 'N/A')})")
+            if pt.get("ip_correlation"):
+                ipc = pt["ip_correlation"]
+                ipi = ipc.get("ip_info", {})
+                lines.append(f"    IP Correlation:       {ipc['correlation_verdict']} -> Δ {ipc['distance_km']} km ({ipc['distance_miles']} mi) from IP {ipi.get('ip')} ({ipi.get('city')}, {ipi.get('country')})")
+                lines.append(f"    IP Provider:          {ipi.get('isp')} | ASN: {ipi.get('autonomous_system')}")
+                lines.append(f"    Correlation Verdict:  {ipc['explanation']}")
             if pt.get("closest_city"):
                 lines.append(f"    Location (Offline):   {pt['closest_city']}, {pt.get('admin_region', '')}, {pt.get('country', '')} (~{pt.get('approx_distance_to_city_km')} km)")
             if pt.get("online_address"):
@@ -629,11 +682,15 @@ def locate(
         pt_table.add_column("Nearest City", style="yellow")
         pt_table.add_column("Timezone", style="white")
         pt_table.add_column("Day Phase", style="magenta")
+        if geofence_path:
+            pt_table.add_column("Geofence", style="bold")
+        if ip_geo_data:
+            pt_table.add_column("IP Correlation", style="bold")
         pt_table.add_column("Capture Time", style="dim")
 
         for idx, pt in enumerate(geo_points, start=1):
             day_ph = pt.get("solar_chronolocation", {}).get("day_phase", "-") if pt.get("solar_chronolocation") else "-"
-            pt_table.add_row(
+            row = [
                 str(idx),
                 pt["file_name"],
                 f"{pt['y']:.5f}°",
@@ -641,8 +698,23 @@ def locate(
                 pt.get("closest_city") or "-",
                 pt.get("timezone") or "-",
                 day_ph,
-                pt.get("timestamp") or "-",
-            )
+            ]
+            if geofence_path:
+                gf_st = pt.get("geofence_status", "-")
+                gf_style = "[green]INSIDE[/green]" if "INSIDE" in gf_st else "[bold red]BREACH[/bold red]"
+                row.append(gf_style)
+            if ip_geo_data:
+                ipc = pt.get("ip_correlation")
+                if ipc:
+                    dist_k = ipc["distance_km"]
+                    if ipc["is_suspicious"]:
+                        row.append(f"[bold red]Δ {dist_k:,.0f}km (DISCREPANCY)[/bold red]")
+                    else:
+                        row.append(f"[green]Δ {dist_k:.1f}km ({ipc['correlation_verdict']})[/green]")
+                else:
+                    row.append("-")
+            row.append(pt.get("timestamp") or "-")
+            pt_table.add_row(*row)
         console.print(pt_table)
 
         if trajectory_steps:
@@ -964,6 +1036,56 @@ def corpus_learn(target: str, entry_id: str, model: str, encoder: str) -> None:
     console.print(f"  Encoder:     {encoder}")
     console.print(f"  Subsampling: {ss_str}")
     console.print(f"  DQT Samples: {len(lum_sample)} values")
+
+
+# -----------------------------------------------------------------------------
+# Subcommand: geo (Geospatial Dataset & Ingestion Management)
+# -----------------------------------------------------------------------------
+@cli.group("geo")
+def geo_group() -> None:
+    """Manage offline geospatial datasets, spatial indexing, and NDJSON ingestion."""
+    pass
+
+
+@geo_group.command("stats")
+def geo_stats() -> None:
+    """Display statistics and indexing status for the offline geospatial databases."""
+    places = GeoLocator.load_offline_database()
+    ne_db = NaturalEarthDB.get_instance()
+
+    table = Table(title="matazero Geospatial Intelligence Database Status", border_style="cyan")
+    table.add_column("Component", style="bold white")
+    table.add_column("Status / Count", style="bold green")
+    table.add_column("Details", style="dim")
+
+    table.add_row(
+        "In-Memory Offline Places",
+        f"{len(places):,} places",
+        "Indexed via 3D SpatialKDTree (< 30 microseconds/query)"
+    )
+    table.add_row(
+        "Natural Earth SQLite DB",
+        "[green]CONNECTED[/green]" if ne_db.is_available else "[yellow]NOT CONNECTED[/yellow]",
+        str(ne_db.db_path) if ne_db.is_available else "Not located at default paths"
+    )
+    console.print(table)
+
+
+@geo_group.command("ingest")
+@click.argument("ndjson_file", type=click.Path(exists=True))
+@click.option("-t", "--target", "target_path", default=None, type=click.Path(), help="Target JSON database path")
+@click.option("-l", "--limit", "record_limit", default=None, type=int, help="Maximum number of records to ingest")
+def geo_ingest(ndjson_file: str, target_path: Optional[str], record_limit: Optional[int]) -> None:
+    """Ingest OpenStreetMap or Overture Maps NDJSON files into the offline database."""
+    default_target = target_path or str(Path(__file__).parent.parent / "core" / "data" / "geonames_offline.json")
+    with console.status(f"[cyan]Ingesting places from {ndjson_file}...[/cyan]"):
+        added, total = NDJSONGeoIngester.ingest_and_merge(
+            ndjson_path=ndjson_file,
+            target_json_path=default_target,
+            max_records=record_limit
+        )
+
+    console.print(f"[green][OK] Successfully ingested {added:,} new places into {default_target} (Total: {total:,} places)[/green]")
 
 
 # -----------------------------------------------------------------------------

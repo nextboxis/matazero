@@ -113,10 +113,32 @@ class AuthenticityEvaluator:
             score += 0.2
 
         # 6. Check Metadata Presence & Coherence (Tier 1 & 5)
+        # IDEA 1 & 6 Integration: Do NOT award GPS bonus for Null Island or rejected fixes
         gps_f = next((f for f in record.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
-        if gps_f:
-            reasons.append("GPS geolocation fix embedded in container metadata.")
-            score += 0.1
+        gps_uninitialized = next((f for f in record.findings if f.name == "gps_fix_uninitialized"), None)
+        gps_confidence_f = next((f for f in record.findings if f.name == "gps_location_confidence"), None)
+
+        if gps_f and not gps_uninitialized:
+            # Check confidence level — only award bonus for MEDIUM or HIGH
+            confidence_level = None
+            if gps_confidence_f and isinstance(gps_confidence_f.value, dict):
+                confidence_level = gps_confidence_f.value.get("level")
+
+            if confidence_level in ("REJECTED", "LOW"):
+                # Valid coordinates but low quality — no bonus, add caveat
+                caveats.append(
+                    f"GPS coordinates present but location confidence is {confidence_level}. "
+                    "No authenticity bonus awarded."
+                )
+            else:
+                reasons.append("GPS geolocation fix embedded in container metadata.")
+                score += 0.1
+        elif gps_uninitialized:
+            # Null Island or out-of-bounds — explicitly note in caveats, no bonus
+            caveats.append(
+                "GPS metadata present but coordinates are uninitialized/invalid "
+                "(Null Island or out-of-bounds). Not used for authenticity assessment."
+            )
 
         # Determine Verdict
         score = max(0.0, min(1.0, score))

@@ -1,0 +1,36 @@
+{
+  "type": "FeatureCollection",
+  "name": "Global Forensic Coverage Zone",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Primary Forensic Investigation Boundary",
+        "description": "Normalized WGS-84 area of interest for spatial triaging, geofence validation, and location intelligence",
+        "stroke": "#00ffcc",
+        "stroke-width": 2,
+        "stroke-opacity": 0.8,
+        "fill": "#00ffcc",
+        "fill-opacity": 0.1
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-176.475225, 83.645112],
+            [-176.475225, -85.015631],
+            [180.0, -85.015631],
+            [180.0, 83.645112],
+            [-176.475225, 83.645112]
+          ]
+        ]
+      },
+      "bbox": [
+        -176.475225,
+        -85.015631,
+        180.0,
+        83.645112
+      ]
+    }
+  ]
+}

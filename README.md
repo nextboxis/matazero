@@ -273,7 +273,7 @@ matazero ask suspect.jpg --deep "Are there any physical or lighting inconsistenc
 
 # 6. Integrated Tier 7 AI Examination with local vision models
 matazero suspect.jpg -a --ollama llava
-
+ 
 # 7. Forensic Image Comparison & Tampering Diff (Metadata, DQT, Perceptual Hashes, Pixel SSIM)
 python -m matazero diff photo1.jpg photo2.jpg -a
 

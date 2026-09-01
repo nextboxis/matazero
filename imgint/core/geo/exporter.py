@@ -11,7 +11,11 @@ class GeoExporter:
     """Exports structured geospatial evidence records into GeoJSON, Leaflet Maps, and GPX."""
 
     @staticmethod
-    def to_geojson(points: List[Dict[str, Any]], title: str = "matazero Geolocation Evidence") -> Dict[str, Any]:
+    def to_geojson(
+        points: List[Dict[str, Any]],
+        title: str = "matazero Geolocation Evidence",
+        geofence_geojson: Optional[str | Path | Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Generates standard RFC 7946 GeoJSON FeatureCollection."""
         features = []
         coordinates_list = []
@@ -20,6 +24,10 @@ class GeoExporter:
             lat = pt.get("latitude") or pt.get("y")
             lon = pt.get("longitude") or pt.get("x")
             if lat is None or lon is None:
+                continue
+
+            # IDEA 1: Skip Null Island coordinates in exports
+            if abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001:
                 continue
 
             coordinates_list.append([lon, lat])
@@ -65,6 +73,16 @@ class GeoExporter:
                 },
             })
 
+        # If geofence provided, append geofence polygon features
+        if geofence_geojson:
+            try:
+                from imgint.core.geo.locator import GeoLocator
+                gf_features = GeoLocator.load_geojson_features(geofence_geojson)
+                for gf in gf_features:
+                    features.append(gf)
+            except Exception:
+                pass
+
         # Calculate bounding box
         bbox = None
         if coordinates_list:
@@ -89,18 +107,46 @@ class GeoExporter:
         return geojson_doc
 
     @staticmethod
-    def to_leaflet_html(points: List[Dict[str, Any]], title: str = "matazero Forensic Geolocation Dossier") -> str:
+    def to_leaflet_html(
+        points: List[Dict[str, Any]],
+        title: str = "matazero Forensic Geolocation Dossier",
+        geofence_geojson: Optional[str | Path | Dict[str, Any]] = None,
+    ) -> str:
         """Generates a standalone, rich interactive Leaflet / OpenStreetMap HTML Map."""
         valid_points = []
         for idx, pt in enumerate(points):
             lat = pt.get("latitude") or pt.get("y")
             lon = pt.get("longitude") or pt.get("x")
             if lat is not None and lon is not None:
+                # IDEA 1: Skip Null Island coordinates in exports
+                if abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001:
+                    continue
                 item = dict(pt)
                 item["lat"] = float(lat)
                 item["lon"] = float(lon)
                 item["idx"] = idx + 1
+
+                # If geofence provided, check inside status
+                if geofence_geojson:
+                    try:
+                        from imgint.core.geo.locator import GeoLocator
+                        gf_res = GeoLocator.is_point_in_geofence(float(lat), float(lon), geofence_geojson)
+                        item["inside_geofence"] = gf_res.get("inside_geofence", False)
+                        item["geofence_boundary"] = gf_res.get("matched_feature_name")
+                    except Exception:
+                        pass
+
                 valid_points.append(item)
+
+        geofence_data_json = "null"
+        if geofence_geojson:
+            try:
+                from imgint.core.geo.locator import GeoLocator
+                gf_feats = GeoLocator.load_geojson_features(geofence_geojson)
+                if gf_feats:
+                    geofence_data_json = json.dumps({"type": "FeatureCollection", "features": gf_feats})
+            except Exception:
+                pass
 
         if not valid_points:
             center_lat, center_lon = 20.0, 0.0
@@ -218,6 +264,7 @@ class GeoExporter:
 
     <script>
         const points = {points_json};
+        const geofenceGeoJson = {geofence_data_json};
         
         // Tile Layers
         const osm = L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
@@ -254,12 +301,19 @@ class GeoExporter:
             const latlng = [p.lat, p.lon];
             latlngs.push(latlng);
 
+            const facSummary = (p.facility_proximity && p.facility_proximity.summary) || (p.facility_context && p.facility_context.summary) || '';
+            const solar = p.solar_chronolocation || {{}};
+            const ipCorr = p.ip_correlation || {{}};
+
             const popupContent = `
                 <div class="popup-title">#${{p.idx}} ${{p.file_name || 'Evidence Asset'}}</div>
                 <div class="popup-field">Coordinates: <b>${{p.lat.toFixed(6)}}°, ${{p.lon.toFixed(6)}}°</b></div>
                 ${{p.closest_city ? `<div class="popup-field">Nearest City: <b>${{p.closest_city}}, ${{p.country || ''}}</b></div>` : ''}}
+                ${{facSummary && facSummary !== 'No major aviation or maritime transit hub within immediate proximity.' ? `<div class="popup-field">Facility Context: <b style="color: #58a6ff;">${{facSummary}}</b></div>` : ''}}
+                ${{solar.solar_elevation_degrees !== undefined ? `<div class="popup-field">Solar Chronolocation: <b>${{solar.day_phase || 'Solar'}} (El: ${{solar.solar_elevation_degrees}}°, Az: ${{solar.solar_azimuth_degrees}}°)</b></div>` : ''}}
+                ${{ipCorr.correlation_verdict ? `<div class="popup-field">IP Correlation: <b style="${{ipCorr.is_suspicious ? 'color: #ff7b72;' : 'color: #3fb950;'}}">${{ipCorr.correlation_verdict}} (Δ ${{ipCorr.distance_km}}km)</b></div>` : ''}}
                 ${{p.timestamp ? `<div class="popup-field">Capture Time: <b>${{p.timestamp}}</b></div>` : ''}}
-                ${{p.altitude_m !== undefined ? `<div class="popup-field">Altitude: <b>${{p.altitude_m}} m</b></div>` : ''}}
+                ${{p.altitude_m !== undefined && p.altitude_m !== null ? `<div class="popup-field">Altitude: <b>${{p.altitude_m}} m</b></div>` : ''}}
                 ${{p.timezone ? `<div class="popup-field">Timezone: <b>${{p.timezone}}</b></div>` : ''}}
                 <div class="popup-links">
                     <a href="https://www.google.com/maps?q=${{p.lat}},${{p.lon}}" target="_blank">Google Maps</a>
@@ -286,6 +340,16 @@ class GeoExporter:
                 <div class="card-row">
                     <span>Location:</span>
                     <span>${{p.closest_city}}</span>
+                </div>` : ''}}
+                ${{facSummary && facSummary !== 'No major aviation or maritime transit hub within immediate proximity.' ? `
+                <div class="card-row">
+                    <span>Facility:</span>
+                    <span style="color: #58a6ff; font-size: 0.75rem; text-align: right; max-width: 220px;">${{facSummary}}</span>
+                </div>` : ''}}
+                ${{solar.day_phase ? `
+                <div class="card-row">
+                    <span>Solar:</span>
+                    <span style="color: #d2a8ff;">${{solar.day_phase}} (${{solar.solar_elevation_degrees}}°)</span>
                 </div>` : ''}}
                 ${{p.timestamp ? `
                 <div class="card-row">
@@ -314,6 +378,28 @@ class GeoExporter:
             }}).addTo(map);
             map.fitBounds(polyline.getBounds(), {{ padding: [50, 50] }});
         }}
+
+        // Render Geofence Polygon layer if provided
+        if (geofenceGeoJson && geofenceGeoJson.features && geofenceGeoJson.features.length > 0) {{
+            const geofenceLayer = L.geoJSON(geofenceGeoJson, {{
+                style: function(feature) {{
+                    return {{
+                        color: feature.properties.stroke || '#00ffcc',
+                        weight: feature.properties['stroke-width'] || 2,
+                        opacity: feature.properties['stroke-opacity'] || 0.85,
+                        fillColor: feature.properties.fill || '#00ffcc',
+                        fillOpacity: feature.properties['fill-opacity'] || 0.12,
+                        dashArray: '4, 6'
+                    }};
+                }},
+                onEachFeature: function(feature, layer) {{
+                    if (feature.properties && feature.properties.name) {{
+                        layer.bindPopup('<b>Geofence:</b> ' + feature.properties.name + '<br>' + (feature.properties.description || ''));
+                    }}
+                }}
+            }}).addTo(map);
+            L.control.layers(null, {{ "Forensic Geofence": geofenceLayer }}).addTo(map);
+        }}
     </script>
 </body>
 </html>"""
@@ -341,6 +427,10 @@ class GeoExporter:
             if lat is None or lon is None:
                 continue
 
+            # IDEA 1: Skip Null Island coordinates in exports
+            if abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001:
+                continue
+
             ele = pt.get("altitude_m")
             time_s = pt.get("timestamp")
             name = pt.get("file_name", "Asset")
@@ -359,3 +449,6 @@ class GeoExporter:
             "</gpx>",
         ])
         return "\n".join(lines)
+
+    # Alias for export compatibility
+    to_html = to_leaflet_html

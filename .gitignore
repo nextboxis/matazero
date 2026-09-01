@@ -51,3 +51,8 @@ scope.json
 *.swo
 .DS_Store
 Thumbs.db
+
+# Large local databases & test media
+sqlite/
+*.sqlite
+IMG*.jpg

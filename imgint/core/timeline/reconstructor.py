@@ -1,4 +1,4 @@
-﻿"""Chronological timeline reconstruction and clock drift estimator."""
+"""Chronological timeline reconstruction and clock drift estimator."""
 
 from __future__ import annotations
 import os
@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from imgint.core.pipeline import AnalysisPipeline
 from imgint.core.governance.scope import AuthorizationScope
 from imgint.core.model.record import AnalysisRecord
+from imgint.core.geo.locator import GeoLocator
 
 
 @dataclass
@@ -112,6 +113,31 @@ class TimelineReconstructor:
                     msg = f"Sequence Inversion: '{curr_event.file_name}' appears after '{prev_event.file_name}' alphabetically but has an earlier timestamp."
                     curr_event.anomalies.append(msg)
                     anomalies.append(msg)
+
+                # IDEA 5: Kinematic Speed Anomaly Detection
+                # Check implied travel speed between consecutive GPS-tagged events
+                if prev_event.gps_coordinates and curr_event.gps_coordinates:
+                    prev_lat, prev_lon = prev_event.gps_coordinates
+                    curr_lat, curr_lon = curr_event.gps_coordinates
+
+                    # Filter out Null Island coordinates from trajectory analysis
+                    prev_valid = not GeoLocator.is_null_island(prev_lat, prev_lon)
+                    curr_valid = not GeoLocator.is_null_island(curr_lat, curr_lon)
+
+                    if prev_valid and curr_valid:
+                        kinematic = GeoLocator.compute_kinematic_speed(
+                            prev_lat, prev_lon, prev_event.primary_timestamp,
+                            curr_lat, curr_lon, curr_event.primary_timestamp,
+                        )
+                        if kinematic and kinematic.get("is_anomalous"):
+                            msg = (
+                                f"Kinematic Speed Anomaly: '{prev_event.file_name}' → '{curr_event.file_name}' "
+                                f"implies {kinematic['speed_kmh']} km/h over {kinematic['distance_km']}km "
+                                f"in {kinematic['time_delta_seconds']}s. "
+                                f"Possible GPS spoofing, metadata splicing, or coordinate injection."
+                            )
+                            curr_event.anomalies.append(msg)
+                            anomalies.append(msg)
 
             # Check clock drift anomaly
             if events[i].camera_clock_drift_seconds is not None:
