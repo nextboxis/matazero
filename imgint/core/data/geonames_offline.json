@@ -1597,6 +1597,15 @@
       "timezone": "UTC"
     },
     {
+      "name": "İzmir Adnan Menderes Airport Airport [ADB]",
+      "country": "Airport",
+      "country_code": "",
+      "admin1": "major",
+      "lat": 38.2912,
+      "lon": 27.1493,
+      "timezone": "UTC"
+    },
+    {
       "name": "Jackson-Evers International Airport Airport [JAN]",
       "country": "Airport",
       "country_code": "",
@@ -2515,15 +2524,6 @@
       "timezone": "UTC"
     },
     {
-      "name": "OR Tambo International Airport Airport [JNB]",
-      "country": "Airport",
-      "country_code": "",
-      "admin1": "major",
-      "lat": -26.1321,
-      "lon": 28.232,
-      "timezone": "UTC"
-    },
-    {
       "name": "Oakland International Airport Airport [OAK]",
       "country": "Airport",
       "country_code": "",
@@ -2539,6 +2539,15 @@
       "admin1": "major",
       "lat": 46.4406,
       "lon": 30.6768,
+      "timezone": "UTC"
+    },
+    {
+      "name": "OR Tambo International Airport Airport [JNB]",
+      "country": "Airport",
+      "country_code": "",
+      "admin1": "major",
+      "lat": -26.1321,
+      "lon": 28.232,
       "timezone": "UTC"
     },
     {
@@ -3619,15 +3628,6 @@
       "admin1": "major",
       "lat": 43.8983,
       "lon": 87.4671,
-      "timezone": "UTC"
-    },
-    {
-      "name": "İzmir Adnan Menderes Airport Airport [ADB]",
-      "country": "Airport",
-      "country_code": "",
-      "admin1": "major",
-      "lat": 38.2912,
-      "lon": 27.1493,
       "timezone": "UTC"
     },
     {
@@ -5566,15 +5566,6 @@
       "timezone": "UTC"
     },
     {
-      "name": "JAGS McCartney International Airport Airport [GDT]",
-      "country": "Airport",
-      "country_code": "",
-      "admin1": "mid",
-      "lat": 21.4421,
-      "lon": -71.1461,
-      "timezone": "UTC"
-    },
-    {
       "name": "Jabalpur Airport Airport [JLR]",
       "country": "Airport",
       "country_code": "",
@@ -5590,6 +5581,15 @@
       "admin1": "mid",
       "lat": 10.0453,
       "lon": -69.3561,
+      "timezone": "UTC"
+    },
+    {
+      "name": "JAGS McCartney International Airport Airport [GDT]",
+      "country": "Airport",
+      "country_code": "",
+      "admin1": "mid",
+      "lat": 21.4421,
+      "lon": -71.1461,
       "timezone": "UTC"
     },
     {
@@ -8653,24 +8653,6 @@
       "timezone": "Africa/Algiers"
     },
     {
-      "name": "Abadla",
-      "country": "Algeria",
-      "country_code": "DZ",
-      "admin1": "BZchar",
-      "lat": 31.0171,
-      "lon": -2.7333,
-      "timezone": "UTC"
-    },
-    {
-      "name": "Beni Ounif",
-      "country": "Algeria",
-      "country_code": "DZ",
-      "admin1": "BZchar",
-      "lat": 32.0493,
-      "lon": -1.2514,
-      "timezone": "UTC"
-    },
-    {
       "name": "Batna",
       "country": "Algeria",
       "country_code": "DZ",
@@ -8722,6 +8704,24 @@
       "admin1": "Bouira",
       "lat": 36.3805,
       "lon": 3.9,
+      "timezone": "UTC"
+    },
+    {
+      "name": "Abadla",
+      "country": "Algeria",
+      "country_code": "DZ",
+      "admin1": "BZchar",
+      "lat": 31.0171,
+      "lon": -2.7333,
+      "timezone": "UTC"
+    },
+    {
+      "name": "Beni Ounif",
+      "country": "Algeria",
+      "country_code": "DZ",
+      "admin1": "BZchar",
+      "lat": 32.0493,
+      "lon": -1.2514,
       "timezone": "UTC"
     },
     {
@@ -8959,15 +8959,6 @@
       "timezone": "Africa/Algiers"
     },
     {
-      "name": "Setif",
-      "country": "Algeria",
-      "country_code": "DZ",
-      "admin1": "SZtif",
-      "lat": 36.18,
-      "lon": 5.4,
-      "timezone": "UTC"
-    },
-    {
       "name": "Saida",
       "country": "Algeria",
       "country_code": "DZ",
@@ -9004,12 +8995,12 @@
       "timezone": "UTC"
     },
     {
-      "name": "Tebessa",
+      "name": "Setif",
       "country": "Algeria",
       "country_code": "DZ",
-      "admin1": "TZbessa",
-      "lat": 35.4104,
-      "lon": 8.12,
+      "admin1": "SZtif",
+      "lat": 36.18,
+      "lon": 5.4,
       "timezone": "UTC"
     },
     {
@@ -9083,6 +9074,15 @@
       "lat": 34.8904,
       "lon": -1.32,
       "timezone": "Africa/Algiers"
+    },
+    {
+      "name": "Tebessa",
+      "country": "Algeria",
+      "country_code": "DZ",
+      "admin1": "TZbessa",
+      "lat": 35.4104,
+      "lon": 8.12,
+      "timezone": "UTC"
     },
     {
       "name": "Pago Pago",
@@ -9328,6 +9328,15 @@
       "timezone": "UTC"
     },
     {
+      "name": "Huambo",
+      "country": "Angola",
+      "country_code": "AO",
+      "admin1": "Huambo",
+      "lat": -12.748,
+      "lon": 15.7581,
+      "timezone": "Africa/Luanda"
+    },
+    {
       "name": "Chibemba",
       "country": "Angola",
       "country_code": "AO",
@@ -9353,15 +9362,6 @@
       "lat": -14.8295,
       "lon": 14.55,
       "timezone": "UTC"
-    },
-    {
-      "name": "Huambo",
-      "country": "Angola",
-      "country_code": "AO",
-      "admin1": "Huambo",
-      "lat": -12.748,
-      "lon": 15.7581,
-      "timezone": "Africa/Luanda"
     },
     {
       "name": "Lubango",
@@ -9976,15 +9976,6 @@
       "timezone": "America/Argentina/Buenos_Aires"
     },
     {
-      "name": "Villa Rumipal",
-      "country": "Argentina",
-      "country_code": "AR",
-      "admin1": "CRrdoba",
-      "lat": -32.1833,
-      "lon": -64.4833,
-      "timezone": "UTC"
-    },
-    {
       "name": "Belen",
       "country": "Argentina",
       "country_code": "AR",
@@ -10514,6 +10505,15 @@
       "lat": -28.12,
       "lon": -58.77,
       "timezone": "America/Argentina/Cordoba"
+    },
+    {
+      "name": "Villa Rumipal",
+      "country": "Argentina",
+      "country_code": "AR",
+      "admin1": "CRrdoba",
+      "lat": -32.1833,
+      "lon": -64.4833,
+      "timezone": "UTC"
     },
     {
       "name": "Alta Gracia",
@@ -18877,6 +18877,159 @@
       "timezone": "America/Fortaleza"
     },
     {
+      "name": "Barra Mansa",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.56,
+      "lon": -44.17,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Cabo Frio",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.89,
+      "lon": -42.04,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Campos",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -21.75,
+      "lon": -41.32,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Duque de Caxias",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.77,
+      "lon": -43.31,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Macae",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.38,
+      "lon": -41.79,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Miracema",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -21.41,
+      "lon": -42.2,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Niteroi",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.9,
+      "lon": -43.1,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Niterói",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.8833,
+      "lon": -43.1036,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Nova Friburgo",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.2819,
+      "lon": -42.5311,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Nova Friburgo",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.26,
+      "lon": -42.5401,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Nova Iguacu",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.74,
+      "lon": -43.47,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Petropolis",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.5095,
+      "lon": -43.2,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Petrópolis",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.505,
+      "lon": -43.1789,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Rio de Janeiro",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.9068,
+      "lon": -43.1729,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Rio de Janeiro",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.9231,
+      "lon": -43.227,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Volta Redonda",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.5231,
+      "lon": -44.1042,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
+      "name": "Volta Redonda",
+      "country": "Brazil",
+      "country_code": "BR",
+      "admin1": "Rio de Janeiro",
+      "lat": -22.5196,
+      "lon": -44.095,
+      "timezone": "America/Sao_Paulo"
+    },
+    {
       "name": "Acu",
       "country": "Brazil",
       "country_code": "BR",
@@ -19270,159 +19423,6 @@
       "admin1": "Rio Grande do Sul",
       "lat": -28.4996,
       "lon": -50.94,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Barra Mansa",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.56,
-      "lon": -44.17,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Cabo Frio",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.89,
-      "lon": -42.04,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Campos",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -21.75,
-      "lon": -41.32,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Duque de Caxias",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.77,
-      "lon": -43.31,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Macae",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.38,
-      "lon": -41.79,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Miracema",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -21.41,
-      "lon": -42.2,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Niteroi",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.9,
-      "lon": -43.1,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Niterói",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.8833,
-      "lon": -43.1036,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Nova Friburgo",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.2819,
-      "lon": -42.5311,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Nova Friburgo",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.26,
-      "lon": -42.5401,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Nova Iguacu",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.74,
-      "lon": -43.47,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Petropolis",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.5095,
-      "lon": -43.2,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Petrópolis",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.505,
-      "lon": -43.1789,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Rio de Janeiro",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.9068,
-      "lon": -43.1729,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Rio de Janeiro",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.9231,
-      "lon": -43.227,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Volta Redonda",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.5231,
-      "lon": -44.1042,
-      "timezone": "America/Sao_Paulo"
-    },
-    {
-      "name": "Volta Redonda",
-      "country": "Brazil",
-      "country_code": "BR",
-      "admin1": "Rio de Janeiro",
-      "lat": -22.5196,
-      "lon": -44.095,
       "timezone": "America/Sao_Paulo"
     },
     {
@@ -34600,6 +34600,69 @@
       "timezone": "Africa/Mbabane"
     },
     {
+      "name": "Mbabane",
+      "country": "eSwatini",
+      "country_code": "SZ",
+      "admin1": "Hhohho",
+      "lat": -26.3167,
+      "lon": 31.1333,
+      "timezone": "Africa/Mbabane"
+    },
+    {
+      "name": "Piggs Peak",
+      "country": "eSwatini",
+      "country_code": "SZ",
+      "admin1": "Hhohho",
+      "lat": -25.961,
+      "lon": 31.247,
+      "timezone": "Africa/Mbabane"
+    },
+    {
+      "name": "Siteki",
+      "country": "eSwatini",
+      "country_code": "SZ",
+      "admin1": "Lubombo",
+      "lat": -26.455,
+      "lon": 31.952,
+      "timezone": "Africa/Mbabane"
+    },
+    {
+      "name": "Lobamba",
+      "country": "eSwatini",
+      "country_code": "SZ",
+      "admin1": "Manzini",
+      "lat": -26.4667,
+      "lon": 31.2,
+      "timezone": "Africa/Mbabane"
+    },
+    {
+      "name": "Manzini",
+      "country": "eSwatini",
+      "country_code": "SZ",
+      "admin1": "Manzini",
+      "lat": -26.495,
+      "lon": 31.388,
+      "timezone": "Africa/Mbabane"
+    },
+    {
+      "name": "Golela",
+      "country": "eSwatini",
+      "country_code": "SZ",
+      "admin1": "Shiselweni",
+      "lat": -27.2962,
+      "lon": 31.9,
+      "timezone": "UTC"
+    },
+    {
+      "name": "Hlatikulu",
+      "country": "eSwatini",
+      "country_code": "SZ",
+      "admin1": "Shiselweni",
+      "lat": -27.0,
+      "lon": 31.4167,
+      "timezone": "Africa/Mbabane"
+    },
+    {
       "name": "Addis Ababa",
       "country": "Ethiopia",
       "country_code": "ET",
@@ -46417,24 +46480,6 @@
       "timezone": "Asia/Jerusalem"
     },
     {
-      "name": "Ramla",
-      "country": "Israel",
-      "country_code": "IL",
-      "admin1": "HaMerkaz",
-      "lat": 31.9167,
-      "lon": 34.8667,
-      "timezone": "Asia/Jerusalem"
-    },
-    {
-      "name": "Nazareth",
-      "country": "Israel",
-      "country_code": "IL",
-      "admin1": "HaZafon",
-      "lat": 32.704,
-      "lon": 35.2955,
-      "timezone": "Asia/Jerusalem"
-    },
-    {
       "name": "Haifa",
       "country": "Israel",
       "country_code": "IL",
@@ -46450,6 +46495,24 @@
       "admin1": "Haifa",
       "lat": 32.8224,
       "lon": 34.9781,
+      "timezone": "Asia/Jerusalem"
+    },
+    {
+      "name": "Ramla",
+      "country": "Israel",
+      "country_code": "IL",
+      "admin1": "HaMerkaz",
+      "lat": 31.9167,
+      "lon": 34.8667,
+      "timezone": "Asia/Jerusalem"
+    },
+    {
+      "name": "Nazareth",
+      "country": "Israel",
+      "country_code": "IL",
+      "admin1": "HaZafon",
+      "lat": 32.704,
+      "lon": 35.2955,
       "timezone": "Asia/Jerusalem"
     },
     {
@@ -50863,21 +50926,21 @@
       "timezone": "Asia/Vientiane"
     },
     {
-      "name": "Vang Vieng",
-      "country": "Laos",
-      "country_code": "LA",
-      "admin1": "Vientiane Province",
-      "lat": 18.9224,
-      "lon": 102.4484,
-      "timezone": "Asia/Vientiane"
-    },
-    {
       "name": "Vientiane",
       "country": "Laos",
       "country_code": "LA",
       "admin1": "Vientiane [prefecture]",
       "lat": 17.9667,
       "lon": 102.6,
+      "timezone": "Asia/Vientiane"
+    },
+    {
+      "name": "Vang Vieng",
+      "country": "Laos",
+      "country_code": "LA",
+      "admin1": "Vientiane Province",
+      "lat": 18.9224,
+      "lon": 102.4484,
       "timezone": "Asia/Vientiane"
     },
     {
@@ -53419,15 +53482,6 @@
       "timezone": "America/Mazatlan"
     },
     {
-      "name": "Mexico City",
-      "country": "Mexico",
-      "country_code": "MX",
-      "admin1": "CDMX",
-      "lat": 19.4326,
-      "lon": -99.1332,
-      "timezone": "America/Mexico_City"
-    },
-    {
       "name": "Campeche",
       "country": "Mexico",
       "country_code": "MX",
@@ -53462,6 +53516,15 @@
       "lat": 18.6537,
       "lon": -91.8245,
       "timezone": "America/Merida"
+    },
+    {
+      "name": "Mexico City",
+      "country": "Mexico",
+      "country_code": "MX",
+      "admin1": "CDMX",
+      "lat": 19.4326,
+      "lon": -99.1332,
+      "timezone": "America/Mexico_City"
     },
     {
       "name": "Escuintla",
@@ -61942,15 +62005,6 @@
       "timezone": "America/Lima"
     },
     {
-      "name": "Tournavista",
-      "country": "Peru",
-      "country_code": "PE",
-      "admin1": "HuRnuco",
-      "lat": -8.9322,
-      "lon": -74.7052,
-      "timezone": "UTC"
-    },
-    {
       "name": "Huancavelica",
       "country": "Peru",
       "country_code": "PE",
@@ -61958,6 +62012,15 @@
       "lat": -12.79,
       "lon": -74.99,
       "timezone": "America/Lima"
+    },
+    {
+      "name": "Tournavista",
+      "country": "Peru",
+      "country_code": "PE",
+      "admin1": "HuRnuco",
+      "lat": -8.9322,
+      "lon": -74.7052,
+      "timezone": "UTC"
     },
     {
       "name": "Huanuco",
@@ -62842,15 +62905,6 @@
       "timezone": "Asia/Manila"
     },
     {
-      "name": "Davao",
-      "country": "Philippines",
-      "country_code": "PH",
-      "admin1": "Davao Del Sur",
-      "lat": 7.112,
-      "lon": 125.6281,
-      "timezone": "Asia/Manila"
-    },
-    {
       "name": "Tagum",
       "country": "Philippines",
       "country_code": "PH",
@@ -62858,6 +62912,15 @@
       "lat": 7.3821,
       "lon": 125.8017,
       "timezone": "UTC"
+    },
+    {
+      "name": "Davao",
+      "country": "Philippines",
+      "country_code": "PH",
+      "admin1": "Davao Del Sur",
+      "lat": 7.112,
+      "lon": 125.6281,
+      "timezone": "Asia/Manila"
     },
     {
       "name": "Surigao",
@@ -63292,21 +63355,21 @@
       "timezone": "UTC"
     },
     {
-      "name": "Zamboanga City",
-      "country": "Philippines",
-      "country_code": "PH",
-      "admin1": "Zamboanga Peninsula",
-      "lat": 6.9214,
-      "lon": 122.079,
-      "timezone": "Asia/Manila"
-    },
-    {
       "name": "Zamboanga",
       "country": "Philippines",
       "country_code": "PH",
       "admin1": "Zamboanga del Sur",
       "lat": 6.9219,
       "lon": 122.0781,
+      "timezone": "Asia/Manila"
+    },
+    {
+      "name": "Zamboanga City",
+      "country": "Philippines",
+      "country_code": "PH",
+      "admin1": "Zamboanga Peninsula",
+      "lat": 6.9214,
+      "lon": 122.079,
       "timezone": "Asia/Manila"
     },
     {
@@ -70348,6 +70411,24 @@
       "timezone": "Africa/Sao_Tome"
     },
     {
+      "name": "Abha",
+      "country": "Saudi Arabia",
+      "country_code": "SA",
+      "admin1": "`Asir",
+      "lat": 18.2301,
+      "lon": 42.5001,
+      "timezone": "Asia/Riyadh"
+    },
+    {
+      "name": "Qal at Bishah",
+      "country": "Saudi Arabia",
+      "country_code": "SA",
+      "admin1": "`Asir",
+      "lat": 20.0087,
+      "lon": 42.5987,
+      "timezone": "Asia/Riyadh"
+    },
+    {
       "name": "Arar",
       "country": "Saudi Arabia",
       "country_code": "SA",
@@ -70696,24 +70777,6 @@
       "admin1": "Tabuk",
       "lat": 28.3838,
       "lon": 36.555,
-      "timezone": "Asia/Riyadh"
-    },
-    {
-      "name": "Abha",
-      "country": "Saudi Arabia",
-      "country_code": "SA",
-      "admin1": "`Asir",
-      "lat": 18.2301,
-      "lon": 42.5001,
-      "timezone": "Asia/Riyadh"
-    },
-    {
-      "name": "Qal at Bishah",
-      "country": "Saudi Arabia",
-      "country_code": "SA",
-      "admin1": "`Asir",
-      "lat": 20.0087,
-      "lon": 42.5987,
       "timezone": "Asia/Riyadh"
     },
     {
@@ -77872,6 +77935,15 @@
       "timezone": "UTC"
     },
     {
+      "name": "Port of Rio de Janeiro",
+      "country": "Seaport",
+      "country_code": "",
+      "admin1": "Port",
+      "lat": -22.8831,
+      "lon": -43.1918,
+      "timezone": "UTC"
+    },
+    {
       "name": "Port of Rio Gallegos",
       "country": "Seaport",
       "country_code": "",
@@ -77905,15 +77977,6 @@
       "admin1": "Port",
       "lat": 18.4203,
       "lon": -70.0181,
-      "timezone": "UTC"
-    },
-    {
-      "name": "Port of Rio de Janeiro",
-      "country": "Seaport",
-      "country_code": "",
-      "admin1": "Port",
-      "lat": -22.8831,
-      "lon": -43.1918,
       "timezone": "UTC"
     },
     {
@@ -83110,6 +83173,15 @@
       "timezone": "UTC"
     },
     {
+      "name": "Madrid",
+      "country": "Spain",
+      "country_code": "ES",
+      "admin1": "Comunidad de Madrid",
+      "lat": 40.402,
+      "lon": -3.6853,
+      "timezone": "Europe/Madrid"
+    },
+    {
       "name": "Pamplona",
       "country": "Spain",
       "country_code": "ES",
@@ -83143,15 +83215,6 @@
       "admin1": "Comunidad Valenciana",
       "lat": 39.487,
       "lon": -0.402,
-      "timezone": "Europe/Madrid"
-    },
-    {
-      "name": "Madrid",
-      "country": "Spain",
-      "country_code": "ES",
-      "admin1": "Comunidad de Madrid",
-      "lat": 40.402,
-      "lon": -3.6853,
       "timezone": "Europe/Madrid"
     },
     {
@@ -87232,15 +87295,6 @@
       "timezone": "Africa/Tunis"
     },
     {
-      "name": "Medenine",
-      "country": "Tunisia",
-      "country_code": "TN",
-      "admin1": "MUdenine",
-      "lat": 33.4,
-      "lon": 10.4167,
-      "timezone": "UTC"
-    },
-    {
       "name": "Mahdia",
       "country": "Tunisia",
       "country_code": "TN",
@@ -87265,6 +87319,15 @@
       "admin1": "Monastir",
       "lat": 35.7307,
       "lon": 10.7673,
+      "timezone": "UTC"
+    },
+    {
+      "name": "Medenine",
+      "country": "Tunisia",
+      "country_code": "TN",
+      "admin1": "MUdenine",
+      "lat": 33.4,
+      "lon": 10.4167,
       "timezone": "UTC"
     },
     {
@@ -92090,15 +92153,6 @@
       "lat": 41.14,
       "lon": -104.8202,
       "timezone": "America/Denver"
-    },
-    {
-      "name": "Christiansted",
-      "country": "United States Virgin Islands",
-      "country_code": "VI",
-      "admin1": "",
-      "lat": 17.7504,
-      "lon": -64.75,
-      "timezone": "UTC"
     },
     {
       "name": "Auburn",
@@ -98545,6 +98599,15 @@
       "timezone": "America/Denver"
     },
     {
+      "name": "Christiansted",
+      "country": "United States Virgin Islands",
+      "country_code": "VI",
+      "admin1": "",
+      "lat": 17.7504,
+      "lon": -64.75,
+      "timezone": "UTC"
+    },
+    {
       "name": "Artigas",
       "country": "Uruguay",
       "country_code": "UY",
@@ -99796,15 +99859,6 @@
       "timezone": "Asia/Ho_Chi_Minh"
     },
     {
-      "name": "Hon Quan",
-      "country": "Vietnam",
-      "country_code": "VN",
-      "admin1": "BNnh Phu?c",
-      "lat": 11.6504,
-      "lon": 106.6,
-      "timezone": "UTC"
-    },
-    {
       "name": "Vung Tau",
       "country": "Vietnam",
       "country_code": "VN",
@@ -99821,6 +99875,15 @@
       "lat": 10.9804,
       "lon": 108.2615,
       "timezone": "Asia/Ho_Chi_Minh"
+    },
+    {
+      "name": "Hon Quan",
+      "country": "Vietnam",
+      "country_code": "VN",
+      "admin1": "BNnh Phu?c",
+      "lat": 11.6504,
+      "lon": 106.6,
+      "timezone": "UTC"
     },
     {
       "name": "Vung Tau",
@@ -99883,6 +99946,15 @@
       "admin1": "Cà Mau",
       "lat": 9.1774,
       "lon": 105.15,
+      "timezone": "Asia/Ho_Chi_Minh"
+    },
+    {
+      "name": "Can Tho",
+      "country": "Vietnam",
+      "country_code": "VN",
+      "admin1": "d?ng b?ng sông C?u Long",
+      "lat": 10.05,
+      "lon": 105.77,
       "timezone": "Asia/Ho_Chi_Minh"
     },
     {
@@ -100273,21 +100345,21 @@
       "timezone": "Asia/Ho_Chi_Minh"
     },
     {
-      "name": "Thai Binh",
-      "country": "Vietnam",
-      "country_code": "VN",
-      "admin1": "ThMi Bmnh",
-      "lat": 20.4503,
-      "lon": 106.333,
-      "timezone": "UTC"
-    },
-    {
       "name": "Thanh Hoa",
       "country": "Vietnam",
       "country_code": "VN",
       "admin1": "Thanh H",
       "lat": 19.82,
       "lon": 105.8,
+      "timezone": "UTC"
+    },
+    {
+      "name": "Thai Binh",
+      "country": "Vietnam",
+      "country_code": "VN",
+      "admin1": "ThMi Bmnh",
+      "lat": 20.4503,
+      "lon": 106.333,
       "timezone": "UTC"
     },
     {
@@ -100372,15 +100444,6 @@
       "timezone": "Asia/Ho_Chi_Minh"
     },
     {
-      "name": "Can Tho",
-      "country": "Vietnam",
-      "country_code": "VN",
-      "admin1": "d?ng b?ng sông C?u Long",
-      "lat": 10.05,
-      "lon": 105.77,
-      "timezone": "Asia/Ho_Chi_Minh"
-    },
-    {
       "name": "Cao Lanh",
       "country": "Vietnam",
       "country_code": "VN",
@@ -100424,6 +100487,15 @@
       "lat": 26.1192,
       "lon": -9.6525,
       "timezone": "UTC"
+    },
+    {
+      "name": "Aden",
+      "country": "Yemen",
+      "country_code": "YE",
+      "admin1": "`Adan",
+      "lat": 12.7797,
+      "lon": 45.0095,
+      "timezone": "Asia/Aden"
     },
     {
       "name": "Aden",
@@ -100612,15 +100684,6 @@
       "admin1": "Ta`izz",
       "lat": 13.6064,
       "lon": 44.0375,
-      "timezone": "Asia/Aden"
-    },
-    {
-      "name": "Aden",
-      "country": "Yemen",
-      "country_code": "YE",
-      "admin1": "`Adan",
-      "lat": 12.7797,
-      "lon": 45.0095,
       "timezone": "Asia/Aden"
     },
     {
@@ -101153,69 +101216,6 @@
       "lat": -20.3296,
       "lon": 30.05,
       "timezone": "Africa/Harare"
-    },
-    {
-      "name": "Mbabane",
-      "country": "eSwatini",
-      "country_code": "SZ",
-      "admin1": "Hhohho",
-      "lat": -26.3167,
-      "lon": 31.1333,
-      "timezone": "Africa/Mbabane"
-    },
-    {
-      "name": "Piggs Peak",
-      "country": "eSwatini",
-      "country_code": "SZ",
-      "admin1": "Hhohho",
-      "lat": -25.961,
-      "lon": 31.247,
-      "timezone": "Africa/Mbabane"
-    },
-    {
-      "name": "Siteki",
-      "country": "eSwatini",
-      "country_code": "SZ",
-      "admin1": "Lubombo",
-      "lat": -26.455,
-      "lon": 31.952,
-      "timezone": "Africa/Mbabane"
-    },
-    {
-      "name": "Lobamba",
-      "country": "eSwatini",
-      "country_code": "SZ",
-      "admin1": "Manzini",
-      "lat": -26.4667,
-      "lon": 31.2,
-      "timezone": "Africa/Mbabane"
-    },
-    {
-      "name": "Manzini",
-      "country": "eSwatini",
-      "country_code": "SZ",
-      "admin1": "Manzini",
-      "lat": -26.495,
-      "lon": 31.388,
-      "timezone": "Africa/Mbabane"
-    },
-    {
-      "name": "Golela",
-      "country": "eSwatini",
-      "country_code": "SZ",
-      "admin1": "Shiselweni",
-      "lat": -27.2962,
-      "lon": 31.9,
-      "timezone": "UTC"
-    },
-    {
-      "name": "Hlatikulu",
-      "country": "eSwatini",
-      "country_code": "SZ",
-      "admin1": "Shiselweni",
-      "lat": -27.0,
-      "lon": 31.4167,
-      "timezone": "Africa/Mbabane"
     }
   ]
 }

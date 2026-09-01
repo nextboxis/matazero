@@ -379,6 +379,21 @@ class GeoExporter:
             map.fitBounds(polyline.getBounds(), {{ padding: [50, 50] }});
         }}
 
+        // Render Optical Viewing Frustum Cones
+        points.forEach(p => {{
+            const cone = p.optical_viewing_cone || p.viewing_cone;
+            if (cone && cone.polygon_latlngs && cone.polygon_latlngs.length > 2) {{
+                const conePolygon = L.polygon(cone.polygon_latlngs, {{
+                    color: '#ff9900',
+                    weight: 1.5,
+                    opacity: 0.8,
+                    fillColor: '#ff9900',
+                    fillOpacity: 0.2
+                }}).addTo(map);
+                conePolygon.bindPopup(`<b>Camera Sightline & FOV Cone</b><br>Heading: ${{cone.heading_deg}}° (${{cone.heading_ref}})<br>HFOV: ${{cone.hfov_degrees}}°<br>Focal Length: ${{cone.focal_length_35mm || cone.focal_length_mm || '50'}}mm`);
+            }}
+        }});
+
         // Render Geofence Polygon layer if provided
         if (geofenceGeoJson && geofenceGeoJson.features && geofenceGeoJson.features.length > 0) {{
             const geofenceLayer = L.geoJSON(geofenceGeoJson, {{
@@ -404,6 +419,121 @@ class GeoExporter:
 </body>
 </html>"""
         return html
+
+    @staticmethod
+    def to_kml(points: List[Dict[str, Any]], doc_name: str = "matazero 3D Geospatial Intelligence Dossier") -> str:
+        """Generates standard OpenGIS KML 2.2 XML with 3D camera placemarks, heading, and trajectory tracks."""
+        lines = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<kml xmlns="http://www.opengis.net/kml/2.2">',
+            '  <Document>',
+            f'    <name>{doc_name}</name>',
+            '    <Style id="cameraPin">',
+            '      <IconStyle>',
+            '        <color>ff00ffff</color>',
+            '        <scale>1.2</scale>',
+            '        <Icon><href>http://maps.google.com/mapfiles/kml/shapes/camera.png</href></Icon>',
+            '      </IconStyle>',
+            '    </Style>',
+            '    <Style id="flightTrack">',
+            '      <LineStyle>',
+            '        <color>ffccff00</color>',
+            '        <width>4</width>',
+            '      </LineStyle>',
+            '    </Style>',
+        ]
+
+        track_coords = []
+        for idx, pt in enumerate(points):
+            lat = pt.get("latitude") or pt.get("lat") or pt.get("y")
+            lon = pt.get("longitude") or pt.get("lon") or pt.get("x")
+            if lat is None or lon is None:
+                continue
+            if abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001:
+                continue
+
+            alt = pt.get("altitude_m", 0.0) or 0.0
+            name = pt.get("file_name", f"Evidence #{idx + 1}")
+            time_str = pt.get("timestamp", "")
+            city = pt.get("closest_city", "Unknown")
+            country = pt.get("country", "")
+            fac = pt.get("facility_proximity", {}).get("summary", "")
+            solar = pt.get("solar_chronolocation", {})
+            cone = pt.get("optical_viewing_cone", {})
+            heading = cone.get("heading_deg", 0.0) if isinstance(cone, dict) else 0.0
+
+            track_coords.append(f"{lon:.6f},{lat:.6f},{alt:.1f}")
+
+            desc = f"<![CDATA["
+            desc += f"<h3>{name}</h3>"
+            desc += f"<p><b>Coordinates:</b> {lat:.6f}°, {lon:.6f}°</p>"
+            desc += f"<p><b>Location:</b> {city}, {country}</p>"
+            if time_str:
+                desc += f"<p><b>Capture Time:</b> {time_str}</p>"
+            if alt:
+                desc += f"<p><b>Altitude:</b> {alt:.1f} m</p>"
+            if fac:
+                desc += f"<p><b>Facilities:</b> {fac}</p>"
+            if solar:
+                desc += f"<p><b>Solar:</b> {solar.get('day_phase', '')} (El: {solar.get('solar_elevation_degrees', '')}°)</p>"
+            desc += f"]]>"
+
+            lines.extend([
+                '    <Placemark>',
+                f'      <name>{name}</name>',
+                f'      <description>{desc}</description>',
+                '      <styleUrl>#cameraPin</styleUrl>',
+                '      <Camera>',
+                f'        <longitude>{lon:.6f}</longitude>',
+                f'        <latitude>{lat:.6f}</latitude>',
+                f'        <altitude>{max(10.0, float(alt))}</altitude>',
+                f'        <heading>{heading}</heading>',
+                '        <tilt>60</tilt>',
+                '        <roll>0</roll>',
+                '        <altitudeMode>relativeToGround</altitudeMode>',
+                '      </Camera>',
+                '      <Point>',
+                '        <extrude>1</extrude>',
+                '        <altitudeMode>relativeToGround</altitudeMode>',
+                f'        <coordinates>{lon:.6f},{lat:.6f},{alt:.1f}</coordinates>',
+                '      </Point>',
+                '    </Placemark>',
+            ])
+
+        if len(track_coords) > 1:
+            lines.extend([
+                '    <Placemark>',
+                '      <name>3D Movement Trajectory</name>',
+                '      <styleUrl>#flightTrack</styleUrl>',
+                '      <LineString>',
+                '        <extrude>1</extrude>',
+                '        <tessellate>1</tessellate>',
+                '        <altitudeMode>relativeToGround</altitudeMode>',
+                '        <coordinates>',
+                '          ' + ' '.join(track_coords),
+                '        </coordinates>',
+                '      </LineString>',
+                '    </Placemark>',
+            ])
+
+        lines.extend([
+            '  </Document>',
+            '</kml>',
+        ])
+        return '\n'.join(lines)
+
+    @staticmethod
+    def to_kmz(points: List[Dict[str, Any]], output_kmz_path: str | Path, doc_name: str = "matazero 3D Geospatial Intelligence Dossier") -> Path:
+        """Packages KML into a compressed KMZ archive for Google Earth Pro."""
+        import zipfile
+        kml_content = GeoExporter.to_kml(points, doc_name=doc_name)
+        out_p = Path(output_kmz_path)
+        out_p.parent.mkdir(parents=True, exist_ok=True)
+
+        with zipfile.ZipFile(out_p, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr('doc.kml', kml_content.encode('utf-8'))
+
+        return out_p
 
     @staticmethod
     def to_gpx(points: List[Dict[str, Any]], track_name: str = "matazero Image Evidence Track") -> str:
@@ -452,3 +582,4 @@ class GeoExporter:
 
     # Alias for export compatibility
     to_html = to_leaflet_html
+

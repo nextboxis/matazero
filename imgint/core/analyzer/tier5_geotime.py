@@ -19,6 +19,7 @@ from imgint.core.analyzer.base import Analyzer, AnalysisContext
 from imgint.core.model.finding import Finding, Confidence, Provenance
 from imgint.core.model.record import Diagnostic
 from imgint.core.geo.locator import GeoLocator
+from imgint.core.geo.optical import OpticalRayCaster
 
 
 class GeoTimeAnalyzer(Analyzer):
@@ -54,6 +55,9 @@ class GeoTimeAnalyzer(Analyzer):
         gps_measure_mode = ctx.get_field_value("GPSMeasureMode")
         gps_diff = ctx.get_field_value("GPSDifferential")
         gps_img_dir = ctx.get_field_value("GPSImgDirection")
+        gps_img_dir_ref = ctx.get_field_value("GPSImgDirectionRef") or "T"
+        focal_len_raw = ctx.get_field_value("FocalLength")
+        focal_len_35_raw = ctx.get_field_value("FocalLengthIn35mmFilm")
         date_orig = ctx.get_field_value("DateTimeOriginal") or ctx.get_field_value("DateTime")
         offset_time = ctx.get_field_value("OffsetTimeOriginal") or ctx.get_field_value("OffsetTime")
 
@@ -318,6 +322,69 @@ class GeoTimeAnalyzer(Analyzer):
                     )
                 )
 
+                # Astronomical Physical Shadow Geometry Analysis
+                solar_el = solar_pos.get("solar_elevation_degrees", 0.0)
+                solar_az = solar_pos.get("solar_azimuth_degrees", 0.0)
+                if solar_el > 0.5:
+                    import math
+                    el_rad = math.radians(solar_el)
+                    shadow_mult = 1.0 / math.tan(el_rad)
+                    shadow_bearing = (solar_az + 180.0) % 360.0
+
+                    shadow_data = {
+                        "solar_elevation_degrees": round(solar_el, 2),
+                        "solar_azimuth_degrees": round(solar_az, 2),
+                        "shadow_bearing_degrees": round(shadow_bearing, 2),
+                        "shadow_length_multiplier": round(shadow_mult, 3),
+                        "expected_shadow_lengths_meters": {
+                            "standing_human_1_8m": round(1.8 * shadow_mult, 2),
+                            "utility_pole_5_0m": round(5.0 * shadow_mult, 2),
+                            "structure_10_0m": round(10.0 * shadow_mult, 2),
+                        },
+                        "day_phase": solar_pos.get("day_phase"),
+                    }
+                    findings.append(
+                        Finding(
+                            name="astronomical_shadow_geometry",
+                            value=shadow_data,
+                            tier=5,
+                            extractor="solar_calculator",
+                            confidence=Confidence.DERIVED,
+                            caveat="Computed ground shadow bearing and length multiplier for authenticating physical outdoor shadows and detecting synthetic/composite subjects.",
+                            provenance=Provenance(source_layer="analyzer", extractor="solar_calculator"),
+                        )
+                    )
+
+        # Optical Viewing Cone & Camera Sightline Frustum
+        if coords_valid and lat_dec is not None and lon_dec is not None and gps_img_dir is not None:
+            try:
+                img_dir_val = self._convert_rational_to_float(gps_img_dir)
+                f_mm = self._convert_rational_to_float(focal_len_raw) if focal_len_raw else None
+                f_35 = self._convert_rational_to_float(focal_len_35_raw) if focal_len_35_raw else None
+
+                cone = OpticalRayCaster.calculate_viewing_cone(
+                    lat=lat_dec,
+                    lon=lon_dec,
+                    heading_deg=img_dir_val,
+                    heading_ref=str(gps_img_dir_ref),
+                    focal_length_35mm=f_35,
+                    focal_length_mm=f_mm,
+                    viewing_distance_meters=300.0,
+                )
+                findings.append(
+                    Finding(
+                        name="optical_viewing_cone",
+                        value=cone.to_dict(),
+                        tier=5,
+                        extractor="optical_raycaster",
+                        confidence=Confidence.DERIVED,
+                        caveat="Camera optical sightline and field-of-view viewing cone projected onto terrain from compass heading and lens focal length.",
+                        provenance=Provenance(source_layer="analyzer", extractor="optical_raycaster"),
+                    )
+                )
+            except Exception:
+                pass
+
         # FR-6.5: Cross-check DateTimeOriginal vs GPSDateStamp
         if date_orig and gps_date:
             date_orig_prefix = str(date_orig).replace(":", "-")[:10]
@@ -524,7 +591,7 @@ class GeoTimeAnalyzer(Analyzer):
         raise ValueError(f"Unrecognized DMS structure {dms_raw}")
 
     def _convert_rational_to_float(self, val: Any) -> float:
-        if isinstance(val, list) and len(val) == 2:
+        if isinstance(val, (list, tuple)) and len(val) == 2:
             num, den = val
             return float(num) / float(den) if den != 0 else float(num)
         return float(val)

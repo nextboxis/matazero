@@ -391,7 +391,7 @@ def analyze(
 @cli.command("locate")
 @click.argument("targets", nargs=-1, required=True, type=click.Path(exists=True))
 @click.option("-o", "--out", "out_file", default=None, type=click.Path(), help="Write output to destination file")
-@click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "report", "json", "geojson", "html", "gpx"]), default="table", help="Output format")
+@click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "report", "json", "geojson", "html", "kml", "kmz", "gpx"]), default="table", help="Output format")
 @click.option("-n", "--allow-network", is_flag=True, help="Enable online reverse geocoding via OpenStreetMap / Nominatim (GR-4.1)")
 @click.option("-r", "--recursive", is_flag=True, help="Recursively search directory targets for images")
 @click.option("--glob", "glob_pattern", default=None, help="Glob pattern to filter files (e.g. '*.jpg')")
@@ -531,6 +531,27 @@ def locate(
             except Exception:
                 pass
 
+            # Optical viewing cone & camera sightline
+            try:
+                img_dir_f = ctx.get_field_value("GPSImgDirection")
+                if img_dir_f is not None:
+                    gta = GeoTimeAnalyzer()
+                    img_dir_v = gta._convert_rational_to_float(img_dir_f)
+                    f_mm_v = gta._convert_rational_to_float(ctx.get_field_value("FocalLength")) if ctx.get_field_value("FocalLength") else None
+                    f_35_v = gta._convert_rational_to_float(ctx.get_field_value("FocalLengthIn35mmFilm")) if ctx.get_field_value("FocalLengthIn35mmFilm") else None
+                    from imgint.core.geo.optical import OpticalRayCaster
+                    cone = OpticalRayCaster.calculate_viewing_cone(
+                        lat=lat,
+                        lon=lon,
+                        heading_deg=img_dir_v,
+                        heading_ref=str(ctx.get_field_value("GPSImgDirectionRef") or "T"),
+                        focal_length_35mm=f_35_v,
+                        focal_length_mm=f_mm_v,
+                    )
+                    point_record["optical_viewing_cone"] = cone.to_dict()
+            except Exception:
+                pass
+
             if geofence_path:
                 try:
                     gf_check = GeoLocator.is_point_in_geofence(val.get("latitude"), val.get("longitude"), geofence_path)
@@ -607,6 +628,13 @@ def locate(
         rendered = json.dumps(GeoExporter.to_geojson(geo_points, geofence_geojson=geofence_path), indent=2)
     elif out_fmt == "html":
         rendered = GeoExporter.to_leaflet_html(geo_points, geofence_geojson=geofence_path)
+    elif out_fmt == "kml":
+        rendered = GeoExporter.to_kml(geo_points)
+    elif out_fmt == "kmz":
+        dest_kmz = out_file or "matazero_dossier.kmz"
+        GeoExporter.to_kmz(geo_points, output_kmz_path=dest_kmz)
+        console.print(f"[green][OK] Successfully exported 3D Google Earth KMZ dossier to [bold]{dest_kmz}[/bold][/green]")
+        return
     elif out_fmt == "gpx":
         rendered = GeoExporter.to_gpx(geo_points)
     elif out_fmt == "json":
