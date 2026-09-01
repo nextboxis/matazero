@@ -239,7 +239,8 @@ Commands:
   cluster     Group evidence files by camera fleet, DQT tables, GPS proximity, or visual similarity
   motion      Detect and carve embedded MP4/HEVC video streams from motion/live photos
   export      Export forensic findings to SQLite database or STIX 2.1 Threat Intel bundles
-  locate      Forensic geolocation, reverse geocoding, solar chronolocation, and interactive maps
+  locate      Forensic geolocation, reverse geocoding, solar chronolocation, and 3D maps
+  geo         Manage offline geospatial datasets, 3D KD-Tree spatial indexing, and NDJSON ingestion
   probe       Dump container segment and chunk structure with byte offsets
   extract     Extract embedded thumbnails, previews, payloads, metadata streams, or -x -y crops
   corpus      Manage and inspect the reference encoder fingerprint corpus
@@ -289,53 +290,65 @@ python -m matazero cluster ./evidence_vault/ -a --by camera
 # 11. Extract and Carve Hidden MP4 Video from Samsung / Google Motion Photos
 python -m matazero motion motion_photo.jpg -c -o ./extracted_video.mp4
 
-# 12. Forensic Geolocation: Coordinates, reverse geocoding, solar angles & map links
+# 12. Forensic Geolocation & Chronolocation (Solar elevation, optical heading, nearest city & airports)
 python -m matazero locate photo.jpg -a
 
-# 13. Multi-image spatial relation, geodesic distance, velocity & travel anomaly check
-python -m matazero locate photo1.jpg photo2.jpg -a
+# 13. Area-of-Interest (AOI) Geofencing: Check evidence coordinates against GeoJSON perimeter
+python -m matazero locate photo.jpg -a --geofence perimeter.geojson
 
-# 14. Generate an interactive standalone Leaflet / OpenStreetMap HTML dossier map
+# 14. IP vs GPS Discrepancy & VPN Detection: Correlate photo location with network IP logs
+python -m matazero locate photo.jpg -a --ip 24.48.0.1
+
+# 15. Export 3D Flight & Drone Paths for Google Earth Pro (.kmz or .kml)
+python -m matazero locate ./case_photos -a -r -f kmz -o flight_dossier.kmz
+
+# 16. Generate an interactive standalone Leaflet / OpenStreetMap HTML dossier map
 python -m matazero locate ./case_photos -a -r -f html -o dossier_map.html
 
-# 15. Export RFC 7946 GeoJSON FeatureCollection with trajectory LineStrings for GIS/QGIS
+# 17. Export RFC 7946 GeoJSON FeatureCollection with trajectory LineStrings for GIS/QGIS
 python -m matazero locate ./case_photos -a -r -f geojson -o case_evidence.geojson
 
-# 16. Extract all embedded slide images, speaker notes, and metadata from Office documents (.docx, .pptx)
+# 18. Inspect Geospatial Intelligence Database & 3D SpatialKDTree indexing status
+python -m matazero geo stats
+
+# 19. Stream-Ingest Overture Maps or OpenStreetMap Settlements (.ndjson)
+python -m matazero geo ingest place-hamlet.ndjson
+
+# 20. Extract all embedded slide images, speaker notes, and metadata from Office documents (.docx, .pptx)
 python -m matazero extract presentation.pptx -a -o ./extracted_presentation_media
 
-# 17. Extract all embedded artefacts, previews, metadata streams, and trailing payloads
+# 21. Extract all embedded artefacts, previews, metadata streams, and trailing payloads
 python -m matazero extract photo.jpg -o ./extracted_assets -a
 
-# 18. Extract a region crop and pixel color at specific -x, -y coordinates
+# 22. Extract a region crop and pixel color at specific -x, -y coordinates
 python -m matazero extract photo.jpg -x 150 -y 200 -w 300 -h 300 -o ./crops
 
-# 19. Complex batch query: recursive directory scan, filtered by GPS, with 8 worker threads
+# 23. Complex batch query: recursive directory scan, filtered by GPS, with 8 worker threads
 python -m matazero analyze ./evidence_drive -a -r --glob "*.jpg" --filter "has_gps" -j 8 -f json -o results.json
 
-# 20. Probe container segments and metadata tag/value byte locations
+# 24. Probe container segments and metadata tag/value byte locations
 python -m matazero probe photo.jpg
 
-# 21. Index Evidence Library into a Queryable SQLite Database for SQL Analytics
+# 25. Index Evidence Library into a Queryable SQLite Database for SQL Analytics
 python -m matazero export sqlite ./case_images/ -a -r -o ./case_vault.db
 
-# 22. Generate STIX 2.1 Threat Intelligence Bundle with Cyber Observable & Indicator Objects
+# 26. Generate STIX 2.1 Threat Intelligence Bundle with Cyber Observable & Indicator Objects
 python -m matazero export stix ./malicious_evidence/ -a -o ./threat_bundle.json
 
-# 23. Learn a new camera hardware fingerprint from a reference shot
+# 27. Learn a new camera hardware fingerprint from a reference shot
 python -m matazero corpus learn ref_shot.jpg -i canon_r5 -m "Canon EOS R5" -e "DIGIC X Hardware ISP"
 
-# 24. Create an authorization scope for forensic custody
+# 28. Create an authorization scope for forensic custody
 python -m matazero scope create -c "CASE-2026-01" -p "Forensic Ingest" -l "Warrant" -a "Lead Investigator" -o scope.json
 python -m matazero scope validate scope.json
 
-# 25. Run scoped analysis under legal custody
+# 29. Run scoped analysis under legal custody
 python -m matazero analyze evidence.jpg -s scope.json
 
-# 26. Verify audit log tamper-resistance
+# 30. Verify audit log tamper-resistance
 python -m matazero audit verify ./audit.jsonl
 
-# 27. Losslessly strip metadata while preserving raw pixel streams
+# 31. Losslessly strip metadata while preserving raw pixel streams
 python -m matazero clean photo.jpg -o cleaned.jpg -c
 ```
 
@@ -367,10 +380,17 @@ python -m matazero clean photo.jpg -o cleaned.jpg -c
 | `model list` | | `--host` | Ollama server host URL (default: `http://localhost:11434`) |
 | `model list` | `-f` | `--format` | Output format: `table`, `json` |
 | `locate` | `-o` | `--out` | Write geolocation output to specified file |
-| `locate` | `-f` | `--format` | Output format: `table`, `report`, `json`, `geojson`, `html`, `gpx` |
+| `locate` | `-f` | `--format` | Output format: `table`, `report`, `json`, `geojson`, `html`, `kml`, `kmz`, `gpx` |
 | `locate` | `-n` | `--allow-network` | Enable online reverse geocoding via OpenStreetMap |
 | `locate` | `-r` | `--recursive` | Recursively search directory targets for images |
 | `locate` | | `--glob` | Filter files by pattern (e.g. `*.jpg`) |
+| `locate` | | `--geofence` | Path to GeoJSON file defining Area of Interest (AOI) boundary |
+| `locate` | | `--ip` | Correlate image GPS with an IP address (e.g. `24.48.0.1`) |
+| `locate` | | `--ip-geo` | Path to IP Geolocation JSON file or raw JSON string |
+| `locate` | | `--sqlite` | Path to Natural Earth Vector SQLite database |
+| `geo stats` | | | Display in-memory places count and 3D KD-Tree status |
+| `geo ingest`| `-t` | `--target` | Target offline JSON database path |
+| `geo ingest`| `-l` | `--limit` | Maximum number of records to ingest |
 | `extract` | `-o` | `--out` | Destination directory for extracted items |
 | `extract` | `-a` | `--all` | Extract all embedded artefacts, metadata blocks, and payloads |
 | `extract` | `-t` | `--thumbnail` | Extract embedded IFD1 thumbnail |
