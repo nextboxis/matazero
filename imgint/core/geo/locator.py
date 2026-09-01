@@ -287,13 +287,17 @@ class GeoLocator:
         if not validation["is_valid"]:
             return None
 
-        # 1. Try direct Natural Earth Vector SQLite database if available
+        sqlite_candidate: Optional[Dict[str, Any]] = None
+        sqlite_dist = float("inf")
+
+        # 1. Check Natural Earth Vector SQLite database if available
         ne_db = NaturalEarthDB.get_instance()
         if ne_db.is_available:
             try:
                 sq_res = ne_db.reverse_geocode(lat, lon, max_distance_km=max_distance_km)
                 if sq_res:
-                    res_dict: Dict[str, Any] = {
+                    sqlite_dist = sq_res.distance_km
+                    sqlite_candidate = {
                         "closest_city": sq_res.name,
                         "admin_region": sq_res.admin1,
                         "country": sq_res.country,
@@ -306,48 +310,48 @@ class GeoLocator:
                         "population": sq_res.population,
                     }
                     if sq_res.is_approximate:
-                        res_dict["location_label"] = sq_res.display_name
-                    return res_dict
+                        sqlite_candidate["location_label"] = sq_res.display_name
             except Exception:
                 pass
 
-        # 2. Fall back to bundled offline JSON database (11,000+ places indexed via SpatialKDTree)
+        # 2. Check bundled dense offline gazetteer (10,600+ places indexed via SpatialKDTree)
+        kdtree_candidate: Optional[Dict[str, Any]] = None
+        kdtree_dist = float("inf")
+
         places = cls.load_offline_database()
-        if not places or not cls._spatial_tree:
-            return None
+        if places and cls._spatial_tree:
+            best_place = cls._spatial_tree.nearest(lat, lon)
+            if best_place:
+                plat = best_place.get("lat")
+                plon = best_place.get("lon")
+                if plat is not None and plon is not None:
+                    kdtree_dist = cls.compute_haversine_distance(lat, lon, float(plat), float(plon))
+                    tz = best_place.get("timezone") or cls.get_timezone(lat, lon)
+                    is_approximate = kdtree_dist > max_distance_km
 
-        best_place = cls._spatial_tree.nearest(lat, lon)
-        if not best_place:
-            return None
+                    kdtree_candidate = {
+                        "closest_city": best_place.get("name"),
+                        "admin_region": best_place.get("admin1"),
+                        "country": best_place.get("country"),
+                        "country_code": best_place.get("country_code", ""),
+                        "timezone": tz,
+                        "approx_distance_km": round(kdtree_dist, 2),
+                        "approx_distance_miles": round(kdtree_dist * 0.621371, 2),
+                        "is_approximate": is_approximate,
+                        "population": best_place.get("population", 0),
+                        "feature_type": best_place.get("feature_type", "Populated Place"),
+                    }
+                    if is_approximate:
+                        kdtree_candidate["location_label"] = (
+                            f"Remote / Offshore Area (approx. {round(kdtree_dist)}km from {best_place.get('name')})"
+                        )
 
-        plat = best_place.get("lat")
-        plon = best_place.get("lon")
-        if plat is None or plon is None:
-            return None
+        # Select the candidate with the smallest geodesic distance
+        if kdtree_candidate and (not sqlite_candidate or kdtree_dist < sqlite_dist):
+            return kdtree_candidate
+        elif sqlite_candidate:
+            return sqlite_candidate
 
-        min_dist_km = cls.compute_haversine_distance(lat, lon, float(plat), float(plon))
-
-        if best_place:
-            tz = best_place.get("timezone") or cls.get_timezone(lat, lon)
-            is_approximate = min_dist_km > max_distance_km
-
-            result: Dict[str, Any] = {
-                "closest_city": best_place.get("name"),
-                "admin_region": best_place.get("admin1"),
-                "country": best_place.get("country"),
-                "country_code": best_place.get("country_code", ""),
-                "timezone": tz,
-                "approx_distance_km": round(min_dist_km, 2),
-                "approx_distance_miles": round(min_dist_km * 0.621371, 2),
-                "is_approximate": is_approximate,
-            }
-
-            if is_approximate:
-                result["location_label"] = (
-                    f"Remote / Offshore Area (approx. {round(min_dist_km)}km from {best_place.get('name')})"
-                )
-
-            return result
         return None
 
     @classmethod
