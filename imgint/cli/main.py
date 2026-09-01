@@ -61,7 +61,26 @@ console = Console(highlight=False)
 err_console = Console(stderr=True, highlight=False)
 
 
-@click.group()
+class DefaultGroup(click.Group):
+    """Custom Click Group that defaults to a specified command (analyze) when invoked directly with image targets or options."""
+
+    def __init__(self, *args, **kwargs):
+        self.default_cmd_name = kwargs.pop("default", None)
+        super().__init__(*args, **kwargs)
+
+    def parse_args(self, ctx, args):
+        if not args:
+            return super().parse_args(ctx, args)
+        if args[0] in ("-h", "--help", "--version"):
+            return super().parse_args(ctx, args)
+        if args[0] in self.commands:
+            return super().parse_args(ctx, args)
+        if self.default_cmd_name:
+            args = [self.default_cmd_name] + list(args)
+        return super().parse_args(ctx, args)
+
+
+@click.group(cls=DefaultGroup, default="analyze")
 @click.version_option(version=__version__, prog_name="matazero")
 def cli() -> None:
     """matazero — Image Intelligence Toolkit for Ethical OSINT and Digital Forensics."""
@@ -1297,13 +1316,15 @@ def skill_info(skill_id: str) -> None:
 # -----------------------------------------------------------------------------
 @cli.command("ask")
 @click.argument("target", type=click.Path(exists=True))
-@click.argument("question")
-@click.option("-m", "--model", "model_name", default=None, help="Local Ollama vision model (default: auto-detected, e.g. llama3.2-vision, moondream)")
+@click.argument("question", required=False, default=None)
+@click.option("--deep", "--details", "deep_mode", is_flag=True, help="Perform an exhaustive, deep forensic visual analysis")
+@click.option("-m", "--model", "model_name", default=None, help="Local Ollama vision model (default: auto-detected, e.g. llama3.2-vision, moondream, llava)")
 @click.option("--host", default="http://localhost:11434", help="Ollama server host (default: http://localhost:11434)")
 @click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "json"]), default="table", help="Output format")
 def ask(
     target: str,
-    question: str,
+    question: Optional[str],
+    deep_mode: bool,
     model_name: Optional[str],
     host: str,
     out_fmt: str,
@@ -1321,14 +1342,29 @@ def ask(
     if not selected_model:
         err_console.print(
             "[bold red][X] No vision models found in local Ollama.[/bold red]\n"
-            "[dim]Pull a vision model with: [bold cyan]ollama pull llama3.2-vision[/bold cyan] or [bold cyan]ollama pull moondream[/bold cyan][/dim]"
+            "[dim]Pull a vision model with: [bold cyan]ollama pull llama3.2-vision[/bold cyan] or [bold cyan]ollama pull llava[/bold cyan][/dim]"
         )
         sys.exit(1)
+
+    if not question:
+        if deep_mode:
+            prompt_text = "Perform an exhaustive forensic visual examination of this image. Detail all visible objects, background setting, text/numbers, lighting/shadow consistency, and any suspicious anomalies."
+            display_question = "Exhaustive Forensic Visual Examination (--deep)"
+        else:
+            prompt_text = "Describe this image in detail, noting visible subjects, objects, setting, and any visible text."
+            display_question = "General Visual Description"
+    else:
+        if deep_mode:
+            prompt_text = f"Perform an exhaustive, deeply detailed forensic examination to answer the following:\n{question}\n\nProvide granular observations on visual features, spatial positioning, text, lighting consistency, and any anomalies."
+            display_question = f"{question} [Deep Mode]"
+        else:
+            prompt_text = question
+            display_question = question
 
     with console.status(f"[cyan]Analyzing image with {selected_model}...[/cyan]"):
         res = client.generate(
             model=selected_model,
-            prompt=question,
+            prompt=prompt_text,
             image_path_or_bytes=target,
         )
 
@@ -1342,11 +1378,12 @@ def ask(
         print(json.dumps({
             "target": str(Path(target).resolve()),
             "model": selected_model,
-            "question": question,
+            "question": display_question,
+            "deep_mode": deep_mode,
             "response": resp_text,
         }, indent=2))
     else:
-        OllamaRenderer.render_ask_response(target, question, selected_model, resp_text, console)
+        OllamaRenderer.render_ask_response(target, display_question, selected_model, resp_text, console)
 
 
 # -----------------------------------------------------------------------------

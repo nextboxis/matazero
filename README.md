@@ -261,17 +261,18 @@ python -m matazero doctor
 python -m matazero scan ./case_photos -o case_dossier.html
 
 # 3. Quick Analysis: Clean Visual Executive Dashboard (Self-Audit mode for personal files)
-python -m matazero analyze photo.jpg -a
+matazero photo.jpg -a
+# (or explicitly: matazero analyze photo.jpg -a)
 
 # 4. Deep Forensic Tree Breakdown: Full 7 tiers, complete tag & value byte locations
-python -m matazero analyze photo.jpg -a --deep
+matazero photo.jpg -a --deep
 
 # 5. Local AI Vision Interrogation: Ask questions about evidence images (100% offline via Ollama)
-python -m matazero ask crime_scene.jpg "What make, model, and color is the vehicle in the background?"
-python -m matazero ask suspect.jpg "Are there any physical or lighting inconsistencies suggesting synthetic generation?"
+matazero ask crime_scene.jpg "What make, model, and color is the vehicle in the background?" -m llava
+matazero ask suspect.jpg --deep "Are there any physical or lighting inconsistencies suggesting synthetic generation?"
 
 # 6. Integrated Tier 7 AI Examination with local vision models
-python -m matazero analyze suspect.jpg -a --ollama llama3.2-vision
+matazero suspect.jpg -a --ollama llava
 
 # 7. Forensic Image Comparison & Tampering Diff (Metadata, DQT, Perceptual Hashes, Pixel SSIM)
 python -m matazero diff photo1.jpg photo2.jpg -a
