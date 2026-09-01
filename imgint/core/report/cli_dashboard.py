@@ -15,6 +15,7 @@ from rich.columns import Columns
 
 from imgint.core.model.record import AnalysisRecord
 from imgint.core.model.finding import Finding, Confidence
+from imgint.core.geo.locator import GeoLocator
 
 
 class CliDashboard:
@@ -119,10 +120,16 @@ class CliDashboard:
             alt = gps_f.get("altitude_m") or gps_f.get("altitude_meters")
 
             if abs(lat) < 0.0001 and abs(lon) < 0.0001:
-                right_table.add_row("Coordinates (X,Y):", "[yellow]0.00000°, 0.00000° (Uninitialized GPS Lock / Null Island)[/yellow]")
+                right_table.add_row("GPS Coordinates:", "[yellow]0.000000, 0.000000 (Uninitialized Lock / Null Island)[/yellow]")
                 right_table.add_row("Location:", "[dim]Geocoding suppressed (No satellite lock)[/dim]")
             else:
-                right_table.add_row("Coordinates (X,Y):", f"X={lon:.5f}° (Lon), Y={lat:.5f}° (Lat)")
+                lat_lon_str = f"{lat:.6f}, {lon:.6f}"
+                dms_str = GeoLocator.format_dms(lat, lon)
+                gmaps_url = f"https://www.google.com/maps?q={lat:.6f},{lon:.6f}"
+                osm_url = f"https://www.openstreetmap.org/?mlat={lat:.6f}&mlon={lon:.6f}#map=16/{lat:.6f}/{lon:.6f}"
+
+                right_table.add_row("GPS (Lat, Lon):", f"[bold white]{lat_lon_str}[/bold white]")
+                right_table.add_row("DMS Format:", f"[dim]{dms_str}[/dim]")
                 if place:
                     right_table.add_row("Nearest City:", f"{place}, {country}" if country else str(place))
                 if tz:
@@ -135,8 +142,8 @@ class CliDashboard:
                     az = solar_f.get("solar_azimuth_degrees", 0.0)
                     right_table.add_row("Solar Chrono:", f"{phase} (Elevation: {el}°, Azimuth: {az}°)")
 
-                maps_url = f"https://www.openstreetmap.org/?mlat={lat:.5f}&mlon={lon:.5f}#map=16/{lat:.5f}/{lon:.5f}"
-                right_table.add_row("Map Link:", f"[link={maps_url}]{maps_url}[/link]")
+                right_table.add_row("Google Maps:", f"[cyan underline link={gmaps_url}]{gmaps_url}[/cyan underline link]")
+                right_table.add_row("OpenStreetMap:", f"[link={osm_url}]{osm_url}[/link]")
         else:
             right_table.add_row("GPS Coordinates:", "[dim]No geolocation metadata found in container[/dim]")
             right_table.add_row("Chronolocation:", "[dim]No solar angle data available[/dim]")

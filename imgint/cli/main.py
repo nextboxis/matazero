@@ -770,8 +770,11 @@ def locate(
             "",
         ]
         for idx, pt in enumerate(geo_points, start=1):
+            dms_str = GeoLocator.format_dms(pt["latitude"], pt["longitude"])
             lines.append(f"[{idx}] {pt['file_name']} (SHA-256: {pt['sha256'][:16]}...)")
-            lines.append(f"    Coordinates (X, Y):   X = {pt['x']}° (Lon), Y = {pt['y']}° (Lat)")
+            lines.append(f"    GPS Coordinates:      {pt['latitude']:.6f}, {pt['longitude']:.6f}  ({dms_str})")
+            lines.append(f"    Google Maps:          {pt['map_links']['google_maps']}")
+            lines.append(f"    OpenStreetMap:        {pt['map_links']['openstreetmap']}")
             if pt.get("altitude_m") is not None:
                 lines.append(f"    Altitude:             {pt['altitude_m']} meters")
             if pt.get("geofence_status"):
@@ -793,8 +796,6 @@ def locate(
             if pt.get("solar_chronolocation"):
                 sol = pt["solar_chronolocation"]
                 lines.append(f"    Solar Position:       Azimuth = {sol.get('solar_azimuth_degrees')}°, Elevation = {sol.get('solar_elevation_degrees')}° ({sol.get('day_phase', 'Daylight')})")
-            lines.append(f"    Map (OpenStreetMap):  {pt['map_links']['openstreetmap']}")
-            lines.append(f"    Map (Google Maps):    {pt['map_links']['google_maps']}")
             lines.append("")
 
         if trajectory_steps:
@@ -823,8 +824,7 @@ def locate(
         pt_table = Table(title=f"Located Evidence Assets ({len(geo_points)})")
         pt_table.add_column("#", justify="right", style="dim")
         pt_table.add_column("File Name", style="bold green")
-        pt_table.add_column("Latitude (Y)", justify="right", style="cyan")
-        pt_table.add_column("Longitude (X)", justify="right", style="cyan")
+        pt_table.add_column("GPS (Lat, Lon)", justify="center", style="bold white")
         pt_table.add_column("Nearest City", style="yellow")
         pt_table.add_column("Timezone", style="white")
         pt_table.add_column("Day Phase", style="magenta")
@@ -839,8 +839,7 @@ def locate(
             row = [
                 str(idx),
                 pt["file_name"],
-                f"{pt['y']:.5f}°",
-                f"{pt['x']:.5f}°",
+                f"{pt['latitude']:.6f}, {pt['longitude']:.6f}",
                 pt.get("closest_city") or "-",
                 pt.get("timezone") or "-",
                 day_ph,

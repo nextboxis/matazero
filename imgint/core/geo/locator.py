@@ -594,6 +594,29 @@ class GeoLocator:
             return None
 
     @staticmethod
+    def format_dms(lat: float, lon: float) -> str:
+        """Format decimal degrees into standard DMS string (e.g. 48°49'48.0"N, 76°57'32.3"E)."""
+        lat_card = "N" if lat >= 0 else "S"
+        lon_card = "E" if lon >= 0 else "W"
+
+        lat_abs = abs(lat)
+        lat_d = int(lat_abs)
+        lat_m = int((lat_abs - lat_d) * 60)
+        lat_s = (lat_abs - lat_d - lat_m / 60.0) * 3600.0
+
+        lon_abs = abs(lon)
+        lon_d = int(lon_abs)
+        lon_m = int((lon_abs - lon_d) * 60)
+        lon_s = (lon_abs - lon_d - lon_m / 60.0) * 3600.0
+
+        return f"{lat_d}°{lat_m}'{lat_s:.1f}\"{lat_card}, {lon_d}°{lon_m}'{lon_s:.1f}\"{lon_card}"
+
+    @staticmethod
+    def format_standard_lat_lon(lat: float, lon: float) -> str:
+        """Format decimal degrees into universal copy-pasteable string (e.g. 48.830000, 76.958970)."""
+        return f"{lat:.6f}, {lon:.6f}"
+
+    @staticmethod
     def get_map_links(lat: float, lon: float) -> Dict[str, str]:
         """Generates direct browser links for popular interactive mapping platforms."""
         lat_f = f"{lat:.6f}"
