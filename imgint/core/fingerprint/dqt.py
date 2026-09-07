@@ -33,11 +33,19 @@ IJG_CHROMINANCE_BASE = [
 @dataclass
 class QuantizationTable:
     table_id: int
-    precision: int  # 0 = 8-bit, 1 = 16-bit
-    values: List[int]
-    table_hash: str
+    precision: int = 0  # 0 = 8-bit, 1 = 16-bit
+    values: List[int] = None
+    table_hash: str = ""
     estimated_quality: Optional[int] = None
     table_type: str = "Unknown"  # "Luminance" (0), "Chrominance" (1), or "Custom"
+
+    def __post_init__(self):
+        if self.values is None:
+            self.values = []
+
+
+# Alias for backwards compatibility / shorthand
+DQTTable = QuantizationTable
 
 
 class DqtExtractor:
@@ -95,9 +103,15 @@ class DqtExtractor:
         if len(values) < 64:
             return 50
 
+        # Guard: all-zeros table is malformed (would cause log(0) in matcher)
+        if all(v == 0 for v in values[:64]):
+            return 50
+
         base = IJG_LUMINANCE_BASE if table_id == 0 else IJG_CHROMINANCE_BASE
         ratios = []
-        for i in range(1, 16):  # Check low/mid frequencies
+        # Sample low-to-mid frequency coefficients (indices 1-32) for better accuracy
+        # on non-standard encoders that deviate mainly in mid-high frequencies
+        for i in range(1, min(33, len(values))):
             if base[i] > 0 and values[i] > 0:
                 ratios.append(values[i] / base[i])
 

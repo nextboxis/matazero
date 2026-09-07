@@ -89,3 +89,28 @@ class Finding:
         if self.metadata:
             res["metadata"] = self.metadata
         return res
+
+    @property
+    def severity(self) -> int:
+        """Map confidence level to a severity ranking (lower = more severe/important).
+
+        - OBSERVED: 1 (highest certainty, most important)
+        - DERIVED: 2
+        - INDICATIVE: 3
+        - INCONCLUSIVE: 4 (lowest certainty)
+        """
+        severity_map = {
+            Confidence.OBSERVED: 1,
+            Confidence.DERIVED: 2,
+            Confidence.INDICATIVE: 3,
+            Confidence.INCONCLUSIVE: 4,
+        }
+        return severity_map.get(self.confidence, 5)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Finding):
+            return NotImplemented
+        return (self.name, self.tier, self.extractor) == (other.name, other.tier, other.extractor)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.tier, self.extractor))

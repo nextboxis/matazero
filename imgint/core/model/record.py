@@ -139,10 +139,24 @@ class AnalysisRecord:
             "timestamp_utc": self.timestamp_utc,
             "not_established": self.not_established,
             "findings": [f.to_dict() for f in self.findings],
-            "diagnostics": [d.to_dict() for d in self.diagnostics],
+            "diagnostics": [diag.to_dict() for diag in self.diagnostics],
             "structural_units": [u.to_dict() for u in self.structural_units],
-            "fields": [f.to_dict() for f in self.fields],
+            "fields": [fld.to_dict() for fld in self.fields],
         }
         if self.authenticity_verdict is not None:
             d["authenticity_verdict"] = self.authenticity_verdict
         return d
+
+    def get_findings_by_tier(self, tier: int) -> List[Finding]:
+        """Return all findings for the specified tier."""
+        return [f for f in self.findings if f.tier == tier]
+
+    def get_findings_by_name(self, name: str) -> List[Finding]:
+        """Return all findings matching the specified name (case-insensitive)."""
+        name_lower = name.lower()
+        return [f for f in self.findings if f.name.lower() == name_lower]
+
+    def has_finding(self, name: str) -> bool:
+        """Check whether a finding with the given name exists."""
+        name_lower = name.lower()
+        return any(f.name.lower() == name_lower for f in self.findings)

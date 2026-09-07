@@ -20,22 +20,40 @@ class JpegGhostDetector:
         qualities: Optional[List[int]] = None,
         block_size: int = 16,
     ) -> Dict[str, Any]:
+        _empty_result = {
+            "is_double_compressed": False,
+            "estimated_primary_quality": None,
+            "detected_ghost_minimums": [],
+            "quality_error_surface": {},
+            "quality_variance": 0.0,
+            "spliced_ghost_detected": False,
+            "dct_8x8_grid_contrast": 0.0,
+            "grid_aligned": False,
+        }
+
         if qualities is None:
             qualities = DEFAULT_GHOST_QUALITIES
 
-        if isinstance(img_or_bytes, bytes):
-            img = Image.open(io.BytesIO(img_or_bytes)).convert("RGB")
-        elif isinstance(img_or_bytes, np.ndarray):
-            img = Image.fromarray(img_or_bytes.astype(np.uint8)).convert("RGB")
-        else:
-            img = img_or_bytes.convert("RGB")
+        try:
+            if isinstance(img_or_bytes, bytes):
+                img = Image.open(io.BytesIO(img_or_bytes)).convert("RGB")
+            elif isinstance(img_or_bytes, np.ndarray):
+                img = Image.fromarray(img_or_bytes.astype(np.uint8)).convert("RGB")
+            else:
+                img = img_or_bytes.convert("RGB")
+        except (OSError, ValueError, SyntaxError):
+            # Corrupt or truncated image — return empty result safely
+            return _empty_result
 
         # Resize if extremely large to prevent OOM
         max_dim = DEFAULT_MAX_ANALYSIS_DIM
         w, h = img.size
+        if w == 0 or h == 0:
+            return _empty_result
         if max(w, h) > max_dim:
             scale = max_dim / float(max(w, h))
-            img = img.resize((int(w * scale), int(h * scale)), Image.Resampling.BILINEAR)
+            new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
+            img = img.resize((new_w, new_h), Image.Resampling.BILINEAR)
 
         orig_np = np.array(img, dtype=np.float32)
         height, width, _ = orig_np.shape
@@ -79,8 +97,8 @@ class JpegGhostDetector:
 
         h_8_energy = np.mean(h_diff[7::8, :]) if h_diff.shape[0] >= 8 else 0.0
         h_other_energy = np.mean(h_diff) + 1e-6
-        
-        if np.isnan(h_other_energy) or h_other_energy == 0:
+
+        if np.isnan(h_other_energy) or np.isnan(h_8_energy) or h_other_energy == 0:
             grid_contrast = 0.0
         else:
             grid_contrast = float(h_8_energy / h_other_energy)

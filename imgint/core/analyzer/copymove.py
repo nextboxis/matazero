@@ -117,9 +117,9 @@ class CopyMoveDetector:
 
                     if len(matched_regions) < 10:
                         matched_regions.append({
-                            "source": {"x": int(p1[0] / scale), "y": int(p1[1] / scale)},
-                            "target": {"x": int(p2[0] / scale), "y": int(p2[1] / scale)},
-                            "block_size": int(block_size / scale),
+                            "source": {"x": int(round(p1[0] / scale)), "y": int(round(p1[1] / scale))},
+                            "target": {"x": int(round(p2[0] / scale)), "y": int(round(p2[1] / scale))},
+                            "block_size": int(round(block_size / scale)),
                         })
 
         # A significant cluster of identical shift vectors indicates deliberate clone-stamping

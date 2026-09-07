@@ -21,6 +21,10 @@ class HuffmanTable:
     class_name: str
 
 
+# Alias for shorthand / test compatibility
+DHTTable = HuffmanTable
+
+
 class DhtExtractor:
     """Extracts Huffman tables from JPEG DHT segments and classifies default vs optimized."""
 

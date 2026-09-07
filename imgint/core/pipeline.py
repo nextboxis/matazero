@@ -88,7 +88,8 @@ class AnalysisPipeline:
             )
 
         # Ingest into evidence store if active
-        file_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        # Use chunked streaming hash to avoid OOM on large RAW files
+        file_sha256 = self._compute_file_sha256(path)
         working_path = path
 
         if self.evidence_store:
@@ -107,10 +108,10 @@ class AnalysisPipeline:
         # Publish AnalysisStartedEvent to ForensicEventBus
         ForensicEventBus.get_default().publish(AnalysisStartedEvent(file_path=str(path)))
 
-        # Create record
+        # Create record — use working_path for accurate size when evidence store is active
         record = AnalysisRecord(
             file_path=str(path),
-            file_size=path.stat().st_size,
+            file_size=working_path.stat().st_size,
             mime_type="application/octet-stream",
             sha256=file_sha256,
             tool_version=__version__,
@@ -398,3 +399,15 @@ class AnalysisPipeline:
         )
 
         return record
+
+    @staticmethod
+    def _compute_file_sha256(path: Path) -> str:
+        """Compute SHA-256 of a file using chunked streaming to avoid OOM on large files."""
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(1024 * 1024)  # 1 MB chunks
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
