@@ -1,3 +1,5 @@
+<div align="center">
+
 ```text
  ███╗   ███╗ █████╗ ████████╗ █████╗ ███████╗███████╗██████╗  ██████╗ 
  ████╗ ████║██╔══██╗╚══██╔══╝██╔══██╗╚══███╔╝██╔════╝██╔══██╗██╔═══██╗
@@ -8,125 +10,119 @@
 ```
 
 # matazero
+### Evidence-Grade Image Intelligence & Forensic Toolkit for OSINT
 
-> **Image Intelligence & Forensic Analysis Toolkit for OSINT and Digital Forensics**
+[![Release](https://img.shields.io/badge/release-v2.1.0-blue.svg?style=flat-square)](https://github.com/nextboxis/matazero/releases)
+[![Container](https://img.shields.io/badge/docker-ghcr.io-blueviolet.svg?style=flat-square&logo=docker)](https://github.com/users/nextboxis/packages?repo_name=matazero)
+[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-informational.svg?style=flat-square&logo=python)](https://python.org)
+[![Air-Gapped OPSEC](https://img.shields.io/badge/opsec-100%25%20offline-success.svg?style=flat-square)](docs/SECURITY.md)
+[![Tamper Proof](https://img.shields.io/badge/audit-SHA--256%20hash--chain-orange.svg?style=flat-square)](docs/ETHICS.md)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg?style=flat-square)](LICENSE)
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
-[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![OPSEC](https://img.shields.io/badge/opsec-100%25%20offline-success.svg)](docs/SECURITY.md)
-[![Governance](https://img.shields.io/badge/governance-hash--chained%20audit-blueviolet.svg)](docs/ETHICS.md)
+<p align="center">
+  <a href="#-overview">Overview</a> •
+  <a href="#-the-7-extraction-tiers">7 Extraction Tiers</a> •
+  <a href="#-installation">Installation</a> •
+  <a href="#-docker--container-package">Docker</a> •
+  <a href="#-quickstart--usage">Quickstart</a> •
+  <a href="#-cli-reference">CLI Reference</a> •
+  <a href="#-guarantees">Guarantees</a>
+</p>
 
 ---
 
-## What is matazero?
+</div>
 
-**matazero** is an image forensics tool designed to recover every piece of data from an image file — including metadata, hardware encoder fingerprints, embedded previews, and hidden trailing payloads. It produces detailed forensic reports with confidence ratings and tamper analysis.
+## 🔭 Overview
 
-Even when social media platforms strip EXIF metadata, `matazero` analyzes the underlying JPEG compression structures (quantization tables, Huffman tables, subsampling ratios) to match the file against known camera hardware and editing software profiles.
+**matazero** is an evidence-grade, air-gapped forensic analysis engine engineered for **digital forensics investigators**, **OSINT analysts**, and **security researchers**. It extracts every recoverable trace from an image: deep metadata blocks, camera hardware compression signatures, hidden trailing payloads, and synthetic generation indicators.
+
+### Why matazero?
+
+* **Attribution Even When Metadata is Stripped**: Social platforms (Twitter, Telegram, WhatsApp) aggressively strip EXIF tags. `matazero` inspects the underlying **JPEG compression matrix** — Quantization Tables (`DQT`), Huffman tables (`DHT`), chroma subsampling (`SOF`), and segment prefix orders — to mathematically attribute images to specific camera hardware ISPs, editing suites, or Generative AI pipelines.
+* **100% Offline & Private**: Zero telemetry. Zero remote cloud calls. Local offline solar chronolocation, local reverse geocoding, and local vision model interrogation (via Ollama).
+* **Forensic Chain of Custody**: Every finding carries verifiable provenance and confidence ratings. Case operations produce tamper-evident, append-only **SHA-256 hash-chained audit trails**.
 
 ```
-┌───────────────────────────────┐
-│     Evidence Image File       │
-└───────────────┬───────────────┘
-                │
-                ▼
+                           ┌───────────────────────────────┐
+                           │      Evidence Image File      │
+                           └───────────────┬───────────────┘
+                                           │
+                                           ▼
 ┌───────────────────────────────┐      ┌───────────────────────────────┐
-│       matazero Engine         │ ◄─── │      Authorization Scope      │
-│  7-Tier Extraction Pipeline   │      │ Case ID · Legal Basis · HMAC  │
-└───────────────┬───────────────┘      └───────────────────────────────┘
-                │
-        ┌───────┴───────────────────────────────┐
-        ▼                                       ▼
-┌───────────────────────────────┐       ┌───────────────────────────────┐
-│   Evidence Dossier / Report   │       │     Audit Log Trail           │
-│ Text · JSON · HTML · Hashes   │       │ Hash-Chained JSONL (SHA-256)  │
-└───────────────────────────────┘       └───────────────────────────────┘
+│      Authorization Scope      │ ───► │        matazero Engine        │
+│  Case ID · Legal Basis · HMAC │      │  7-Tier Extraction Pipeline   │
+└───────────────────────────────┘      └───────────────┬───────────────┘
+                                                       │
+                               ┌───────────────────────┴───────────────────────┐
+                               ▼                                               ▼
+               ┌───────────────────────────────┐               ┌───────────────────────────────┐
+               │   Interactive Case Dossier    │               │    Tamper-Evident Audit Log   │
+               │ Dark HTML · JSON · Leaflet 3D │               │  Hash-Chained JSONL (SHA-256) │
+               └───────────────────────────────┘               └───────────────────────────────┘
 ```
 
 ---
 
-## Key Features
+## 🔬 The 7 Extraction Tiers
 
-* **Attribution Without Metadata**: Reconstructs encoder profiles from raw quantization tables (`DQT`), Huffman tables (`DHT`), and chroma subsampling (`SOF`) against a database of 22+ smartphone, DSLR, social media, and AI generator fingerprints.
-* **1-Command Smart Triage** (`matazero scan`): Auto-triages entire evidence folders with live progress bars, categorizing files as 🟢 Authentic, 🔴 Tampered, 🟣 AI/Synthetic, or 🟡 Inconclusive — with an interactive HTML Case Dossier generated automatically.
-* **System Health Diagnostic** (`matazero doctor`): Verifies Python runtime, sandboxed workers, local Ollama AI, storage vault, and man pages in a single command.
-* **JPEG Ghost & Double Compression Detection**: Detects recompression artifacts and spliced regions by analyzing error surfaces across quality levels with optimized full-image pre-computation.
-* **CFA Bayer Demosaicing Analysis**: Distinguishes physical camera captures from AI-generated images (Midjourney, DALL-E, Flux) by detecting Bayer filter interpolation periodicity in the green channel.
-* **Copy-Move Clone Detection**: Identifies cloned/duplicated regions using block feature matching and canonicalized shift vector clustering.
-* **Local AI Vision Interrogation** (`matazero ask`): Interrogate evidence images with local Ollama vision models (llama3.2-vision, moondream) — 100% offline, zero cloud API calls.
-* **Interactive Dark-Mode HTML Case Dossier**: Generates standalone, responsive `.html` case reports with embedded Leaflet GPS maps, KPI cards, live search, and court-ready evidence tables.
-* **Camera Fingerprint Learning**: Learn and save custom device signatures directly into your local corpus (`matazero corpus learn`).
-* **Automatic Payload Carver**: Detects and extracts hidden trailing archives (ZIP, RAR, 7z, TAR, GZ, Executables) appended past the image end marker (`-c` / `--carve`).
-* **Multi-Format Container Walk**: Inspects segment structures for JPEG, PNG, TIFF/RAW (DNG, CR2, NEF, ARW, RAF), animated GIF, WebP, and ISO-BMFF (HEIC/AVIF).
-* **Process Isolation Sandbox**: Quarantines pixel decoding inside a restricted subprocess with per-task error isolation to protect the host system against malicious image parser exploits.
-* **Chain of Custody & Audit Logging**: Cryptographically verifies evidence integrity using SHA-256 hashing and append-only hash-chained audit logs.
-* **100% Offline & Private**: Zero telemetry, zero cloud dependencies. Solar calculations and reverse geocoding run entirely local.
+| Tier | Layer | Capabilities & Forensic Artifacts |
+|:---:|:---|:---|
+| **Tier 1** | **Metadata Blocks** | EXIF 2.32, XMP (entity-disabled parser), IPTC-IIM (8BIM), ICC color profiles, PNG text chunks, and C2PA cryptographic authenticity manifests. |
+| **Tier 2** | **Encoder Fingerprints** | JPEG `DQT` quantization tables, quality factor estimation (1–100), `DHT` Huffman optimization, chroma subsampling (4:4:4, 4:2:2, 4:2:0), and multi-signal corpus matching. |
+| **Tier 3** | **Embedded Artefacts** | IFD1 embedded thumbnails, MPF multi-picture stereo frames, and trailing data past EOI/IEND markers with Shannon entropy density analysis. |
+| **Tier 4** | **Cryptographic Hashes** | Whole-file SHA-256, pure pixel bitstream SHA-256 (excludes metadata to detect re-tagging), and perceptual hashes (aHash, dHash, pHash). |
+| **Tier 5** | **Geospatial & Temporal** | GPS coordinate parsing, altitude, offline GeoNames reverse geocoding, NOAA solar azimuth/elevation chronolocation, and timeline consistency audits. |
+| **Tier 6** | **Indicators & Verdicts** | Deterministic authenticity classification (`AUTHENTIC`, `TAMPERED`, `AI_SYNTHETIC`), timeline inversions (`ModifyDate` < `DateTimeOriginal`), and Error Level Analysis (ELA). |
+| **Tier 7** | **Content & AI Analysis** | JPEG Ghost double-compression detection, CFA Bayer demosaicing periodicity (physical sensor vs AI model), copy-move clone detection, and local Ollama vision AI. |
 
 ---
 
-## The 7 Extraction Tiers
+## ⚡ Installation
 
-| Tier | Name | What it Extracts |
-|:---:|---|---|
-| **Tier 1** | **Metadata Blocks** | EXIF 2.32, XMP (safe entity-disabled), IPTC-IIM (8BIM), ICC color profiles, PNG text chunks, and C2PA authenticity manifests. |
-| **Tier 2** | **Encoder Fingerprints** | JPEG `DQT` quantization tables, estimated quality factor (1–100), `DHT` Huffman tables, chroma subsampling (4:4:4, 4:2:2, 4:2:0), segment sequence, and hardware corpus matching. |
-| **Tier 3** | **Embedded Artefacts** | IFD1 embedded thumbnails, MPF multi-picture frames, and trailing data past EOI/IEND with entropy analysis. |
-| **Tier 4** | **Cryptographic Hashes** | Whole-file SHA-256, pure image data-stream SHA-256 (excludes metadata to detect re-tagging), and perceptual hashes (aHash, dHash, pHash). |
-| **Tier 5** | **Geospatial & Temporal** | GPS coordinates, altitude, offline GeoNames reverse geocoding, NOAA solar azimuth/elevation chronolocation, and timestamp consistency checks. |
-| **Tier 6** | **Forensic Indicators & Verdicts** | Ground-truth authenticity verdicts, timeline inversions (`ModifyDate` vs `DateTimeOriginal`), Error Level Analysis (ELA via `--ela`), and metadata absence analysis. |
-| **Tier 7** | **Content & AI Analysis** | JPEG ghost double-compression detection, CFA Bayer demosaicing periodicity (camera vs AI-synthetic), copy-move clone detection, local Ollama vision AI interrogation, and LSB entropy screening. |
+### Quick Automated One-Liner
 
----
+<table>
+<tr>
+<td><b>Linux, Kali Linux & macOS</b></td>
+<td><b>Windows (PowerShell)</b></td>
+</tr>
+<tr>
+<td>
 
-## Installation
-
-### Prerequisites
-
-* Python **3.10** or higher
-* `pip` and `git`
-
----
-
-### ⚡ Quick Install (Automated One-Liner)
-
-**Linux, Kali Linux & macOS:**
 ```bash
-git clone https://github.com/nextboxis/matazero.git && cd matazero && chmod +x install.sh && ./install.sh
+git clone https://github.com/nextboxis/matazero.git
+cd matazero && chmod +x install.sh && ./install.sh
 ```
 
-**Windows (PowerShell):**
+</td>
+<td>
+
 ```powershell
-git clone https://github.com/nextboxis/matazero.git; cd matazero; .\install.ps1
+git clone https://github.com/nextboxis/matazero.git
+cd matazero; .\install.ps1
 ```
+
+</td>
+</tr>
+</table>
 
 ---
 
-### Option 1: Manual Install from Source
+### Option 1: Install from Source
 
 ```bash
-# 1. Clone the repository
+# Clone the repository
 git clone https://github.com/nextboxis/matazero.git
 cd matazero
 
-# 2. (Optional but recommended) Create and activate a virtual environment
+# Create and activate virtual environment
 python -m venv .venv
+source .venv/bin/activate       # Linux / macOS
+# .venv\Scripts\Activate.ps1    # Windows PowerShell
 
-# On Linux/macOS:
-source .venv/bin/activate
-
-# On Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-
-# On Windows (Command Prompt):
-.venv\Scripts\activate.bat
-
-# 3. Install dependencies
+# Install dependencies and CLI package
 pip install -r requirements.txt
-
-# For development / testing dependencies (includes pytest):
-pip install -r requirements-dev.txt
-
-# 4. Install the CLI package in editable mode
 pip install -e .
 ```
 
@@ -134,342 +130,181 @@ pip install -e .
 
 ### Option 2: Direct Install via Git
 
-Install the latest release directly into your active Python environment:
-
 ```bash
 pip install git+https://github.com/nextboxis/matazero.git
 ```
 
 ---
 
-### Option 3: Zero-Install / Standalone Execution
+### Option 3: Zero-Install Standalone Execution
 
-Run `matazero` directly without global installation:
+Run directly via the Python runtime without registering system binaries:
 
 ```bash
-# Install core dependencies
 pip install -r requirements.txt
-
-# Run directly via Python module or wrapper scripts
 python -m matazero --help
-python mata.py --help
-python matazero.py --help
 ```
 
 ---
 
-### Option 4: Docker Container (GitHub Packages)
+## 🐳 Docker / Container Package
 
-Pull and run the pre-built container image from the GitHub Container Registry (`ghcr.io`):
+Pre-built, lightweight container images are published directly to the **[GitHub Container Registry](https://github.com/users/nextboxis/packages?repo_name=matazero)** (`ghcr.io`):
 
 ```bash
-# Pull the latest container package
+# Pull the latest container
 docker pull ghcr.io/nextboxis/matazero:latest
 
-# Analyze an image by mounting your local evidence directory
-docker run --rm -v "${PWD}:/evidence" ghcr.io/nextboxis/matazero:latest analyze sample.jpg --summary
+# Run interactive health check
+docker run --rm ghcr.io/nextboxis/matazero:latest doctor
+
+# Analyze an evidence folder (mount current directory to /evidence)
+docker run --rm -v "${PWD}:/evidence" ghcr.io/nextboxis/matazero:latest scan . -o dossier.html
 ```
 
 ---
 
-### 🐧 Setting up Local AI Vision on Kali Linux (Ollama)
+## 🚀 Quickstart & Usage
 
-To enable 100% offline local AI visual interrogation (`matazero ask`) and Tier 7 AI inspection (`matazero analyze --ollama`) on **Kali Linux** or any Debian/Ubuntu-based distribution:
+### 1. System Health Check
+Verify Python runtime, subprocess sandboxing, local Ollama models, and storage:
+```bash
+matazero doctor
+```
+
+### 2. 1-Command Evidence Triage (`scan`)
+Auto-triage an entire folder of photos with live progress bars and generate an interactive dark-mode HTML case dossier:
+```bash
+matazero scan ./case_photos -o case_dossier.html
+```
+
+### 3. Executive Visual Dashboard
+Run self-audit mode on an image to view camera attribution, GPS, and authenticity verdicts:
+```bash
+matazero photo.jpg -a
+```
+
+### 4. Deep Forensic Tree Inspection
+Inspect all 7 tiers with precise tag names, byte offsets, and hex locations:
+```bash
+matazero photo.jpg -a --deep
+```
+
+### 5. Offline AI Visual Interrogation (`ask`)
+Ask natural-language questions about an image using local Ollama vision models (zero cloud requests):
+```bash
+matazero ask crime_scene.jpg "Transcribe all visible license plates, badges, and street signs"
+```
+
+### 6. Detect Splicing & Clones (Copy-Move & JPEG Ghost)
+Analyze compression error surfaces and duplicate regions:
+```bash
+matazero analyze forged.jpg -a --ela
+matazero stego suspect.png -a --save-bitplanes ./bitplane_slices
+```
+
+### 7. Chronolocation & Forensic Geolocation
+Calculate sun position and verify photo timestamp against physical daylight angles:
+```bash
+matazero locate photo.jpg -a
+```
+
+---
+
+## 🐧 Local AI Vision on Kali Linux / Debian
+
+To interrogate evidence photos offline using Ollama vision models:
 
 ```bash
-# 1. Install Ollama on Kali Linux
+# 1. Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 
-# 2. Verify the Ollama daemon is running
-systemctl status ollama
-# (If not using systemd, start it manually: ollama serve)
+# 2. Pull lightweight vision model
+ollama pull llama3.2-vision    # High accuracy (~4.0 GB)
+ollama pull moondream          # Ultra fast (~1.8 GB)
 
-# 3. Pull recommended local vision models
-ollama pull llama3.2-vision    # High-accuracy vision model (~4.0 GB)
-ollama pull moondream          # Ultra-lightweight, fast vision model (~1.8 GB)
-ollama pull llava              # Standard multimodal model (~4.5 GB)
-
-# 4. Verify model availability with matazero
+# 3. Verify model detection
 matazero model list
 
-# 5. Interrogate evidence photos on Kali Linux
-matazero ask evidence.jpg "Transcribe all visible license plates and street names"
-matazero analyze evidence.jpg -a --ollama llama3.2-vision
+# 4. Interrogate evidence photos
+matazero ask evidence.jpg "Are there any anatomical or lighting inconsistencies suggesting synthetic generation?"
 ```
 
 ---
 
-## CLI Access & Global Aliases
+## 📑 CLI Reference
 
-Once installed via `pip install -e .` or `pip install .`, the CLI registers three interchangeable global commands:
-
-| Command | Description |
-|:---|:---|
-| `matazero` | Primary CLI entry point |
-| `mata` | Convenient short alias |
-| `imgint` | Engine alias |
-| `python -m matazero` | Direct module execution (always works even if PATH is not configured) |
-
-### Verify Installation
-
-```bash
-matazero --version
-matazero --help
-```
-
----
-
-## Shell Autocompletion
-
-`matazero` supports tab autocompletion for Bash, Zsh, and Fish shells:
-
-```bash
-# Bash
-matazero completion bash > ~/.local/share/bash-completion/completions/matazero
-
-# Zsh
-matazero completion zsh > ~/.zfunc/_matazero
-# (Ensure fpath=(~/.zfunc $fpath) and autoload -Uz compinit && compinit are in your ~/.zshrc)
-
-# Fish
-matazero completion fish > ~/.config/fish/completions/matazero.fish
-```
-
----
-
-## CLI Reference & Quickstart
+<details>
+<summary><b>Click to expand full command reference</b></summary>
 
 ```text
 matazero <command> [options] [targets...]
 
-Commands:
+Core Commands:
   doctor      System health & environment diagnostic (Python, sandbox, Ollama, storage)
   scan        Smart 1-command evidence auto-triage with live progress and HTML dossier
   analyze     Run 7 extraction tiers over evidence files (supports -r, --glob, --filter, -j)
   ask         Interrogate an evidence image using your local Ollama vision model (offline)
-  diff        Forensic comparison between two images (structure, metadata, DQT, and pixels)
-  stego       Deep steganography, multi-channel bitplane slicing, and Chi-Square PoV inspection
-  timeline    Reconstruct multi-asset chronological timelines and estimate camera clock drift
-  cluster     Group evidence files by camera fleet, DQT tables, GPS proximity, or visual similarity
-  motion      Detect and carve embedded MP4/HEVC video streams from motion/live photos
+  diff        Forensic comparison between two images (structure, metadata, DQT, pixels)
+  stego       Deep steganography, bitplane slicing (0-7), and Chi-Square PoV inspection
+  timeline    Reconstruct multi-asset chronological timelines and estimate clock drift
+  cluster     Group evidence files by camera fleet, DQT tables, GPS, or visual similarity
+  motion      Detect and carve embedded MP4/HEVC video streams from motion photos
   export      Export forensic findings to SQLite database or STIX 2.1 Threat Intel bundles
-  locate      Forensic geolocation, reverse geocoding, solar chronolocation, and 3D maps
-  geo         Manage offline geospatial datasets, 3D KD-Tree spatial indexing, and NDJSON ingestion
-  probe       Dump container segment and chunk structure with byte offsets
-  extract     Extract embedded thumbnails, previews, payloads, metadata streams, or -x -y crops
+  locate      Forensic geolocation, reverse geocoding, solar chronolocation, 3D maps
+  geo         Manage offline geospatial datasets, 3D KD-Tree indexing, NDJSON ingestion
+  probe       Dump container segment and chunk structure with exact byte offsets
+  extract     Extract embedded thumbnails, previews, payloads, or -x -y coordinate crops
   corpus      Manage and inspect the reference encoder fingerprint corpus
   model       Manage and inspect local Ollama vision models
-  skill       Manage and inspect dynamically loaded forensic skills
-  scope       Create, validate, or display an authorization scope
+  scope       Create, validate, or display an HMAC-signed authorization scope
   audit       Verify or export the tamper-evident audit log
   clean       Losslessly remove metadata in self-audit mode
   completion  Generate shell completion scripts (bash, zsh, fish)
 ```
 
-### Common Usage Examples
+### Key Flags Cheat-Sheet
 
-```bash
-# 1. System Health & Environment Diagnostics (Verify sandbox, Ollama, vault)
-python -m matazero doctor
-
-# 2. Smart 1-Command Evidence Auto-Triage (Live progress bars & Interactive HTML Dossier)
-python -m matazero scan ./case_photos -o case_dossier.html
-
-# 3. Quick Analysis: Clean Visual Executive Dashboard (Self-Audit mode for personal files)
-matazero photo.jpg -a
-# (or explicitly: matazero analyze photo.jpg -a)
-
-# 4. Deep Forensic Tree Breakdown: Full 7 tiers, complete tag & value byte locations
-matazero photo.jpg -a --deep
-
-# 5. Local AI Vision Interrogation: Ask questions about evidence images (100% offline via Ollama)
-matazero ask crime_scene.jpg "What make, model, and color is the vehicle in the background?" -m llava
-matazero ask suspect.jpg --deep "Are there any physical or lighting inconsistencies suggesting synthetic generation?"
-
-# 6. Integrated Tier 7 AI Examination with local vision models
-matazero suspect.jpg -a --ollama llava
- 
-# 7. Forensic Image Comparison & Tampering Diff (Metadata, DQT, Perceptual Hashes, Pixel SSIM)
-python -m matazero diff photo1.jpg photo2.jpg -a
-
-# 8. Deep Steganography & Multi-Channel Bitplane Slicing (Planes 0-7, Chi-Square PoV Test)
-python -m matazero stego suspect.png -a --save-bitplanes ./bitplane_slices
-
-# 9. Case Chronological Timeline & Camera Clock Drift Reconstruction (Plaso/Timesketch & CSV)
-python -m matazero timeline ./case_images/ -a -r -f plaso -o timeline_plaso.csv
-
-# 10. Multi-Image Dataset Clustering & Fleet Outlier Detection
-python -m matazero cluster ./evidence_vault/ -a --by camera
-
-# 11. Extract and Carve Hidden MP4 Video from Samsung / Google Motion Photos
-python -m matazero motion motion_photo.jpg -c -o ./extracted_video.mp4
-
-# 12. Forensic Geolocation & Chronolocation (Solar elevation, optical heading, nearest city & airports)
-python -m matazero locate photo.jpg -a
-
-# 13. Area-of-Interest (AOI) Geofencing: Check evidence coordinates against GeoJSON perimeter
-python -m matazero locate photo.jpg -a --geofence perimeter.geojson
-
-# 14. IP vs GPS Discrepancy & VPN Detection: Correlate photo location with network IP logs
-python -m matazero locate photo.jpg -a --ip 24.48.0.1
-
-# 15. Export 3D Flight & Drone Paths for Google Earth Pro (.kmz or .kml)
-python -m matazero locate ./case_photos -a -r -f kmz -o flight_dossier.kmz
-
-# 16. Generate an interactive standalone Leaflet / OpenStreetMap HTML dossier map
-python -m matazero locate ./case_photos -a -r -f html -o dossier_map.html
-
-# 17. Export RFC 7946 GeoJSON FeatureCollection with trajectory LineStrings for GIS/QGIS
-python -m matazero locate ./case_photos -a -r -f geojson -o case_evidence.geojson
-
-# 18. Inspect Geospatial Intelligence Database & 3D SpatialKDTree indexing status
-python -m matazero geo stats
-
-# 19. Stream-Ingest Overture Maps or OpenStreetMap Settlements (.ndjson)
-python -m matazero geo ingest place-hamlet.ndjson
-
-# 20. Extract all embedded slide images, speaker notes, and metadata from Office documents (.docx, .pptx)
-python -m matazero extract presentation.pptx -a -o ./extracted_presentation_media
-
-# 21. Extract all embedded artefacts, previews, metadata streams, and trailing payloads
-python -m matazero extract photo.jpg -o ./extracted_assets -a
-
-# 22. Extract a region crop and pixel color at specific -x, -y coordinates
-python -m matazero extract photo.jpg -x 150 -y 200 -w 300 -h 300 -o ./crops
-
-# 23. Complex batch query: recursive directory scan, filtered by GPS, with 8 worker threads
-python -m matazero analyze ./evidence_drive -a -r --glob "*.jpg" --filter "has_gps" -j 8 -f json -o results.json
-
-# 24. Probe container segments and metadata tag/value byte locations
-python -m matazero probe photo.jpg
-
-# 25. Index Evidence Library into a Queryable SQLite Database for SQL Analytics
-python -m matazero export sqlite ./case_images/ -a -r -o ./case_vault.db
-
-# 26. Generate STIX 2.1 Threat Intelligence Bundle with Cyber Observable & Indicator Objects
-python -m matazero export stix ./malicious_evidence/ -a -o ./threat_bundle.json
-
-# 27. Learn a new camera hardware fingerprint from a reference shot
-python -m matazero corpus learn ref_shot.jpg -i canon_r5 -m "Canon EOS R5" -e "DIGIC X Hardware ISP"
-
-# 28. Create an authorization scope for forensic custody
-python -m matazero scope create -c "CASE-2026-01" -p "Forensic Ingest" -l "Warrant" -a "Lead Investigator" -o scope.json
-python -m matazero scope validate scope.json
-
-# 29. Run scoped analysis under legal custody
-python -m matazero analyze evidence.jpg -s scope.json
-
-# 30. Verify audit log tamper-resistance
-python -m matazero audit verify ./audit.jsonl
-
-# 31. Losslessly strip metadata while preserving raw pixel streams
-python -m matazero clean photo.jpg -o cleaned.jpg -c
-```
-
----
-
-## Short Flags Reference
-
-| Subcommand | Short | Long Flag | Description |
-| :--- | :--- | :--- | :--- |
-| `analyze` | `-s` | `--scope` | Path to authorization scope JSON |
-| `analyze` | `-a` | `--self-audit` | Run in self-audit mode without an external scope |
-| `analyze` | | `--deep`, `--details`| Display full hierarchical forensic tree with all 7 tiers |
+| Subcommand | Flag | Long Flag | Description |
+| :--- | :---: | :--- | :--- |
+| `analyze` | `-a` | `--self-audit` | Run in self-audit mode without external legal scope |
+| `analyze` | `-s` | `--scope` | Path to HMAC-signed authorization scope JSON |
+| `analyze` | | `--deep` | Display full hierarchical 7-tier forensic tree |
 | `analyze` | | `--summary` | Display executive visual summary dashboard |
-| `analyze` | `-f` | `--format` | Output format: `report`, `dashboard`, `deep`, `summary`, `text`, `json`, `ndjson`, `table`, `html` |
-| `analyze` | `-o` | `--out` | Write output to specified file |
-| `analyze` | `-t` | `--tiers` | Comma-separated list of tiers to run (e.g. `1,2,3,4,7`) |
 | `analyze` | `-e` | `--ela` | Enable Error Level Analysis (Tier 6) |
-| `analyze` | `-c` | `--carve` | Automatically extract trailing payloads / archives |
-| `analyze` | `-n` | `--allow-network` | Enable disclosed network lookups (GR-4.1) |
-| `analyze` | `-r` | `--recursive` | Recursively scan directory targets for images |
-| `analyze` | | `--glob` | Filter files by pattern (e.g. `*.jpg`, `**/*.png`, `*.pptx`) |
-| `analyze` | | `--filter` | Filter records (e.g. `has_gps`, `has_payload`, `authentic=false`) |
-| `analyze` | | `--select-fields`| Comma-separated metadata fields to retain |
-| `analyze` | | `--ollama` | Run local Ollama vision model inspection in Tier 7 |
-| `analyze` | `-j` | `--jobs` | Number of parallel worker threads (default: 1) |
-| `ask` | `-m` | `--model` | Local Ollama vision model (e.g. `llama3.2-vision`, `moondream`) |
-| `ask` | | `--host` | Ollama server host URL (default: `http://localhost:11434`) |
-| `ask` | `-f` | `--format` | Output format: `table`, `json` |
-| `model list` | | `--host` | Ollama server host URL (default: `http://localhost:11434`) |
-| `model list` | `-f` | `--format` | Output format: `table`, `json` |
-| `locate` | `-o` | `--out` | Write geolocation output to specified file |
-| `locate` | `-f` | `--format` | Output format: `table`, `report`, `json`, `geojson`, `html`, `kml`, `kmz`, `gpx` |
-| `locate` | `-n` | `--allow-network` | Enable online reverse geocoding via OpenStreetMap |
-| `locate` | `-r` | `--recursive` | Recursively search directory targets for images |
-| `locate` | | `--glob` | Filter files by pattern (e.g. `*.jpg`) |
-| `locate` | | `--geofence` | Path to GeoJSON file defining Area of Interest (AOI) boundary |
-| `locate` | | `--ip` | Correlate image GPS with an IP address (e.g. `24.48.0.1`) |
-| `locate` | | `--ip-geo` | Path to IP Geolocation JSON file or raw JSON string |
-| `locate` | | `--sqlite` | Path to Natural Earth Vector SQLite database |
-| `geo stats` | | | Display in-memory places count and 3D KD-Tree status |
-| `geo ingest`| `-t` | `--target` | Target offline JSON database path |
-| `geo ingest`| `-l` | `--limit` | Maximum number of records to ingest |
-| `extract` | `-o` | `--out` | Destination directory for extracted items |
-| `extract` | `-a` | `--all` | Extract all embedded artefacts, metadata blocks, and payloads |
-| `extract` | `-t` | `--thumbnail` | Extract embedded IFD1 thumbnail |
-| `extract` | `-p` | `--preview` | Extract RAW preview / MPF secondary images |
-| `extract` | `-c` | `--payload` | Carve and extract trailing payload archives |
-| `extract` | `-m` | `--metadata` | Extract raw metadata blocks (EXIF, XMP, IPTC, ICC, C2PA) |
-| `extract` | `-x` | `--x-pos` | X coordinate for region/pixel extraction |
-| `extract` | `-y` | `--y-pos` | Y coordinate for region/pixel extraction |
-| `extract` | `-w` | `--width` | Width for crop region (default: 200) |
-| `extract` | `-h` | `--height` | Height for crop region (default: 200) |
-| `corpus learn` | `-i` | `--id` | Unique profile ID |
-| `corpus learn` | `-m` | `--model` | Camera or device model description |
-| `corpus learn` | `-e` | `--encoder` | Software or hardware encoder name |
-| `scope create` | `-c` | `--case` | Case identifier |
-| `scope create` | `-p` | `--purpose` | Investigation purpose |
-| `scope create` | `-l` | `--legal-basis` | Lawful authority / warrant |
-| `scope create` | `-a` | `--authorising-party` | Authorising party name/role |
-| `scope create` | `-d` | `--days` | Scope validity window in days (default: 30) |
-| `scope create` | `-o` | `--out` | Output path for scope JSON file |
-| `scope create` | `-k` | `--secret` | HMAC secret key for signing |
-| `scope validate`| `-k` | `--secret` | HMAC secret key for validation |
-| `clean` | `-o` | `--out` | Destination path for cleaned file |
-| `clean` | `-c` | `--commit` | Execute modification (dry-run without it) |
+| `analyze` | `-c` | `--carve` | Automatically extract trailing payloads and archives |
+| `analyze` | `-j` | `--jobs` | Number of parallel worker threads |
+| `analyze` | `-f` | `--format` | Output format: `report`, `dashboard`, `deep`, `json`, `html` |
+| `ask` | `-m` | `--model` | Local Ollama vision model (`llama3.2-vision`, `moondream`) |
+| `locate` | `-f` | `--format` | Output: `table`, `json`, `geojson`, `html`, `kml`, `kmz` |
+| `extract` | `-a` | `--all` | Extract all embedded artefacts, previews, and payloads |
+| `extract` | `-c` | `--payload` | Extract trailing payload archives past EOI |
+
+</details>
 
 ---
 
-## Exit Codes
+## 🛡️ Guarantees & Forensic Standards
 
-| Code | Status | Meaning |
-|:---:|---|---|
-| `0` | **Success** | Complete analysis finished successfully |
-| `1` | **Runtime Error** | Unhandled execution exception |
-| `2` | **Usage Error** | Invalid CLI options or argument syntax |
-| `3` | **Unsupported Format** | File magic bytes not recognized |
-| `4` | **Partial Success** | Batch completed with non-fatal diagnostics |
-| `5` | **Budget Exceeded** | Resource/unit/depth safety limit exceeded |
-| `6` | **Authorization Failure** | Missing, invalid, or expired authorization scope |
-| `7` | **Custody Failure** | Evidence hash mismatch or broken audit chain |
+`matazero` is built for court admissibility and strict adherence to forensic integrity:
+
+* 🔒 **Air-Gapped Operation**: 100% offline. Zero telemetry, zero web beacons, zero remote database queries.
+* 🛡️ **Cryptographic Custody**: SHA-256 digest calculated at ingest; append-only hash-chained audit logs detect any post-ingest file tampering.
+* ⚖️ **Deterministic Confidence**: Every finding explicitly states its tier, extractor, confidence ranking, and legal caveat.
+* 🚫 **Ethical Safeguards**: Zero biometric surveillance or facial recognition scraping. Built solely for defensive forensic verification.
 
 ---
 
-## Forensic Standards & Guarantees
+## 📚 Documentation & Technical Plans
 
-`matazero` is engineered for courtroom-grade, verifiable image intelligence with strict architectural guarantees:
-
-| 🔒 Privacy & Operational Safety | 🛡️ Forensic Standards & Custody |
-| :--- | :--- |
-| **100% Offline & Air-Gapped** (Zero telemetry, zero external APIs) | **Deterministic Verdicts** (`AUTHENTIC`, `TAMPERED`, `SYNTHETIC`) with confidence scoring |
-| **Zero Biometric Surveillance** (No facial recognition or identity tracking) | **Cryptographic Audit Log** (SHA-256 hash-chained tamper-proofing) |
-| **No Bulk Web Scraping** (No automated crawling or social graph tracking) | **Verifiable Provenance** for every finding across all 7 extraction tiers |
-| **No External Database Queries** (Evidence never leaves your machine) | **Strict Legal Scopes** (HMAC-SHA256 signed authorization tokens) |
-
----
-
-## Documentation
-
-* [PRD (Product Requirements Document)](plan/PRD.md)
-* [SRD (Software Requirements Document)](plan/SRD.md)
-* [SRS (Software Requirements Specification)](plan/SRS.md)
 * [Architecture & Decision Records](plan/ARCHITECTURE.md)
+* [Software Requirements Document (SRD)](plan/SRD.md)
+* [Product Requirements Document (PRD)](plan/PRD.md)
 * [Security Policy & Threat Model](docs/SECURITY.md)
-* [Ethics & Governance](docs/ETHICS.md)
+* [Ethics & Governance Standards](docs/ETHICS.md)
 
 ---
 
-## License
+## 📄 License
 
-Distributed under the **Apache 2.0 License**. See [LICENSE](LICENSE) for details.
+Distributed under the **Apache 2.0 License**. See [LICENSE](LICENSE) for full terms.
