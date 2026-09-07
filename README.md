@@ -158,6 +158,20 @@ python matazero.py --help
 
 ---
 
+### Option 4: Docker Container (GitHub Packages)
+
+Pull and run the pre-built container image from the GitHub Container Registry (`ghcr.io`):
+
+```bash
+# Pull the latest container package
+docker pull ghcr.io/nextboxis/matazero:latest
+
+# Analyze an image by mounting your local evidence directory
+docker run --rm -v "${PWD}:/evidence" ghcr.io/nextboxis/matazero:latest analyze sample.jpg --summary
+```
+
+---
+
 ### 🐧 Setting up Local AI Vision on Kali Linux (Ollama)
 
 To enable 100% offline local AI visual interrogation (`matazero ask`) and Tier 7 AI inspection (`matazero analyze --ollama`) on **Kali Linux** or any Debian/Ubuntu-based distribution:
