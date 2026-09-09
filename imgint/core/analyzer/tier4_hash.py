@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import hashlib
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from imgint.core.analyzer.base import Analyzer, AnalysisContext
 from imgint.core.model.finding import Finding, Confidence, Provenance
 from imgint.core.model.record import Diagnostic

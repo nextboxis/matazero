@@ -4,11 +4,14 @@ from __future__ import annotations
 import getpass
 import hashlib
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -64,7 +67,8 @@ class AuditLogger:
         self.scope_id = scope_id
         try:
             self.operator = getpass.getuser()
-        except Exception:
+        except Exception as e:
+            logger.warning("Could not determine current user via getpass: %s; falling back to 'analyst'", e)
             self.operator = "analyst"
         self._last_hash = self.GENESIS_HASH
         self._last_index = -1

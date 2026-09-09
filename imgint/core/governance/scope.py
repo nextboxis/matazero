@@ -4,12 +4,15 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 from imgint.core.governance.refusals import enforce_refusals
+
+logger = logging.getLogger(__name__)
 
 
 class ScopeValidationError(Exception):
@@ -47,7 +50,8 @@ class AuthorizationScope:
                 exp = exp.replace(tzinfo=timezone.utc)
             now = datetime.now(timezone.utc)
             return now > exp
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to parse scope expiry_date '%s': %s. Treating scope as expired.", self.expiry_date, e)
             return True
 
     def is_analyzer_permitted(self, analyzer_id: str, tier: int) -> bool:

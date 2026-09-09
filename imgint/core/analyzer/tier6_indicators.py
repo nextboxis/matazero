@@ -50,7 +50,9 @@ class IndicatorsAnalyzer(Analyzer):
             dt_orig = self._parse_iso_or_exif(str(dt_orig_str))
             dt_mod = self._parse_iso_or_exif(str(dt_mod_str))
             if dt_orig and dt_mod:
-                if dt_mod < dt_orig:
+                orig_cmp = dt_orig if dt_orig.tzinfo is not None else dt_orig.replace(tzinfo=timezone.utc)
+                mod_cmp = dt_mod if dt_mod.tzinfo is not None else dt_mod.replace(tzinfo=timezone.utc)
+                if mod_cmp < orig_cmp:
                     findings.append(
                         Finding(
                             name="indicator_timeline_inversion",
@@ -109,8 +111,19 @@ class IndicatorsAnalyzer(Analyzer):
         return findings, diagnostics
 
     def _parse_iso_or_exif(self, s: str) -> Optional[datetime]:
-        clean = s.strip().split("+")[0].split(".")[0]
-        for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S"):
+        s = s.strip()
+        if not s:
+            return None
+        # 1. Try ISO 8601 first to preserve timezone and subsecond precision
+        try:
+            iso_s = s.replace("Z", "+00:00") if s.endswith("Z") else s
+            return datetime.fromisoformat(iso_s)
+        except Exception:
+            pass
+
+        # 2. Fallback to EXIF and standard datetime formats
+        clean = s.split(".")[0]
+        for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
             try:
                 return datetime.strptime(clean, fmt)
             except Exception:

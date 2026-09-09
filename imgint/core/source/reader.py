@@ -18,6 +18,7 @@ class BoundedReader:
         self,
         source: Union[bytes, str, Path],
         max_read_size: int = 16 * 1024 * 1024,  # 16 MB max per chunk
+        max_file_size: int = 256 * 1024 * 1024,  # 256 MB max total file size
         max_units: int = 4096,
         max_depth: int = 16,
     ):
@@ -28,9 +29,15 @@ class BoundedReader:
         else:
             self._path = Path(source)
             self._size = self._path.stat().st_size
+            if self._size > max_file_size:
+                raise SourceBoundsError(
+                    f"File size {self._size:,} bytes exceeds maximum allowed "
+                    f"{max_file_size:,} bytes. Use max_file_size parameter to override."
+                )
             with open(self._path, "rb") as f:
                 self._buffer = f.read()
         self.max_read_size = max_read_size
+        self.max_file_size = max_file_size
         self.max_units = max_units
         self.max_depth = max_depth
         self.unit_count = 0
