@@ -18,7 +18,7 @@ from imgint.core.sandbox.process import SandboxRunner
 
 @dataclass
 class ExtractedItem:
-    item_type: str  # "thumbnail", "preview", "mpf_frame", "payload", "metadata_block", "crop"
+    item_type: str
     output_path: str
     size_bytes: int
     offset: Optional[int] = None
@@ -62,17 +62,18 @@ class ArtefactExtractor:
         reader = BoundedReader(p)
         detected = FormatDetector.detect(reader)
         if not detected.is_supported:
+            reader.close()
             return extracted
 
         registry = create_default_container_registry()
         container_reader = registry.get_reader(detected.format_name)
         if not container_reader:
+            reader.close()
             return extracted
 
         units, blocks, _ = container_reader.read(reader)
         stem = p.stem
 
-        # 1. Extract IFD1 Thumbnail
         if include_thumbnail:
             for b in blocks:
                 if b.kind in ("EXIF", "TIFF_EXIF"):
@@ -93,9 +94,7 @@ class ArtefactExtractor:
                             )
                         )
 
-        # 2. Extract RAW/TIFF Previews & MPF Secondary Frames
         if include_preview:
-            # Check for embedded JPEG preview in RAW / TIFF
             raw_bytes = reader.get_all_bytes()
             prev_data = PreviewExtractor.extract_preview(raw_bytes)
             if prev_data:
@@ -112,7 +111,6 @@ class ArtefactExtractor:
                     )
                 )
 
-            # MPF Frames
             for b in blocks:
                 if b.kind == "MPF":
                     mpf_list = MpfExtractor.extract_from_mpf_block(b)
@@ -131,7 +129,6 @@ class ArtefactExtractor:
                             )
                         )
 
-        # 3. Carve Trailing Payloads (ZIP, RAR, 7z, EXE, ELF, etc.)
         if include_payload:
             carved = PayloadCarver.carve_trailing_payload(reader, units, destination)
             if carved:
@@ -146,10 +143,8 @@ class ArtefactExtractor:
                     )
                 )
 
-        # 4. Extract Raw Metadata Blocks & Office Assets
         if include_metadata:
             for idx, b in enumerate(blocks):
-                # Handle embedded presentation images (PPTX / DOCX / XLSX)
                 if b.kind == "EMBEDDED_IMAGE":
                     img_name = Path(b.source_unit).name if b.source_unit else f"image_{idx + 1}.png"
                     m_file = destination / f"{stem}_{img_name}"
@@ -167,7 +162,6 @@ class ArtefactExtractor:
                     )
                     continue
 
-                # Handle office speaker notes
                 if b.kind == "OFFICE_SPEAKER_NOTES":
                     note_name = Path(b.source_unit).stem if b.source_unit else f"note_{idx + 1}"
                     n_file = destination / f"{stem}_{note_name}.txt"
@@ -216,7 +210,6 @@ class ArtefactExtractor:
                     )
                 )
 
-        # 5. Extract Cropped Region at -x, -y Coordinates
         if crop_coords and "x" in crop_coords and "y" in crop_coords:
             cx = crop_coords["x"]
             cy = crop_coords["y"]
@@ -252,4 +245,5 @@ class ArtefactExtractor:
                         )
                     )
 
+        reader.close()
         return extracted

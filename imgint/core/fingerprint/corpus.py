@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Valid JPEG marker names for segment_prefix validation
 VALID_JPEG_MARKERS = frozenset({
     "SOI", "EOI", "SOS", "DQT", "DHT", "DRI",
     "SOF0", "SOF1", "SOF2", "SOF3", "SOF5", "SOF6", "SOF7",
@@ -123,7 +122,6 @@ class ReferenceCorpus:
         if corpus_path:
             self.corpus_path = Path(corpus_path)
         else:
-            # Default to bundled package seed data
             self.corpus_path = Path(__file__).parent.parent / "data" / "corpus_seed.json"
 
         self.version = "2026.09.1-disambiguated"
@@ -171,7 +169,6 @@ class ReferenceCorpus:
                         logger.warning("Skipping malformed user corpus entry: %s", error)
                         continue
                     entry = _parse_entry(item)
-                    # User entries OVERRIDE seed entries with the same ID
                     self.entries = [e for e in self.entries if e.entry_id != entry.entry_id]
                     self.entries.append(entry)
         except json.JSONDecodeError as e:
@@ -195,14 +192,12 @@ class ReferenceCorpus:
                 logger.warning("Could not read existing user corpus, starting fresh: %s", e)
                 existing_entries = []
 
-        # Update or append
         existing_entries = [e for e in existing_entries if e.get("id") != entry.entry_id]
         existing_entries.append(entry.to_dict())
 
         with open(user_p, "w", encoding="utf-8") as f:
             json.dump({"corpus_version": "user-custom", "entries": existing_entries}, f, indent=2)
 
-        # Update runtime list (user entries override)
         self.entries = [e for e in self.entries if e.entry_id != entry.entry_id]
         self.entries.append(entry)
 

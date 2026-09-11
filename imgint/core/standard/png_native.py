@@ -26,7 +26,6 @@ class PngNativeParser(BlockParser):
         source_unit = block.source_unit or ""
 
         if "tEXt" in source_unit:
-            # Keyword\0Text
             if b"\x00" in data:
                 k, v = data.split(b"\x00", 1)
                 keyword = k.decode("latin-1", errors="replace").strip()
@@ -46,13 +45,12 @@ class PngNativeParser(BlockParser):
                 )
 
         elif "zTXt" in source_unit:
-            # Keyword\0CompressionMethod(1 byte)\0CompressedText
             if b"\x00" in data:
                 k, rest = data.split(b"\x00", 1)
                 keyword = k.decode("latin-1", errors="replace").strip()
                 val_abs_offset = block.offset + len(k) + 2
                 if len(rest) > 1:
-                    compressed_data = rest[1:]  # Skip compression method byte
+                    compressed_data = rest[1:]
                     try:
                         decompressed = zlib.decompress(compressed_data)
                         val = decompressed.decode("latin-1", errors="replace").strip()
@@ -72,7 +70,6 @@ class PngNativeParser(BlockParser):
                         diagnostics.append(Diagnostic(level="warning", message=f"zTXt decompression failed: {e}", source="png_native_parser", offset=block.offset))
 
         elif "iTXt" in source_unit:
-            # Structure: Keyword\0CompFlag(1B)CompMethod(1B)LangTag\0TransKey\0Text
             if b"\x00" in data:
                 null_idx = data.find(b"\x00")
                 keyword = data[:null_idx].decode("utf-8", errors="replace").strip()

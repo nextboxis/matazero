@@ -21,7 +21,6 @@ class DiffRenderer:
         name_a = Path(result.target_a).name
         name_b = Path(result.target_b).name
 
-        # Header Panel
         verdict_color = "green" if "EXACT" in result.relationship_verdict or "IDENTICAL" in result.relationship_verdict else "yellow" if "METADATA" in result.relationship_verdict or "RECOMPRESSION" in result.relationship_verdict else "bold red"
         
         panel_content = Text()
@@ -36,32 +35,27 @@ class DiffRenderer:
 
         console.print(Panel(panel_content, title="[bold]matazero Forensic Image Diff[/bold]", border_style="cyan"))
 
-        # Core Metrics Table
         metrics_table = Table(title="Integrity & Similarity Metrics", show_header=True)
         metrics_table.add_column("Comparative Layer", style="bold")
         metrics_table.add_column("Metric / Status", style="yellow")
         metrics_table.add_column("Forensic Interpretation", style="dim")
 
-        # Hashes
         sha_s = "[green]MATCH (Identical)[/green]" if result.sha256_match else "[red]DIVERGENT[/red]"
         metrics_table.add_row("Full File SHA-256", sha_s, "Whole-file bitwise integrity")
 
         data_s = "[green]MATCH (Identical Streams)[/green]" if result.data_hash_match else "[yellow]DIVERGENT[/yellow]" if not result.sha256_match else "[green]MATCH[/green]"
         metrics_table.add_row("Pure Data SHA-256", data_s, "Image payload without metadata headers")
 
-        # Perceptual Hashes
         if result.phash_distance is not None:
             phash_s = f"{result.phash_distance} bits"
             ph_interp = "Visually identical" if result.phash_distance == 0 else "Near match" if result.phash_distance <= 5 else "Different content"
             metrics_table.add_row("pHash Hamming Distance", phash_s, ph_interp)
 
-        # DQT Quantization
         if result.dqt_similarity_pct is not None:
             dqt_s = f"{result.dqt_similarity_pct}% (Distance: {result.dqt_euclidean_distance})"
             dqt_interp = "Identical quantization tables" if result.dqt_similarity_pct == 100 else "Re-compressed or different encoder"
             metrics_table.add_row("JPEG DQT Similarity", dqt_s, dqt_interp)
 
-        # Pixel Diff
         if result.pixel_diff:
             px = result.pixel_diff
             alt_s = f"{px.get('altered_pixels_count', 0):,} ({px.get('altered_pixels_pct', 0)}%)"
@@ -71,7 +65,6 @@ class DiffRenderer:
         console.print(metrics_table)
         console.print("")
 
-        # Metadata Diff Table
         m_diff = result.metadata_diff
         total_meta_changes = len(m_diff.added) + len(m_diff.removed) + len(m_diff.modified)
         if total_meta_changes > 0:

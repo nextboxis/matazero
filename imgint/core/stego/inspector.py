@@ -1,12 +1,15 @@
-﻿"""Steganography, bitplane slicing, and statistical anomaly inspector."""
+"""Steganography, bitplane slicing, and statistical anomaly inspector."""
 
 from __future__ import annotations
+import logging
 import math
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from imgint.core.sandbox.process import SandboxRunner
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -17,9 +20,9 @@ class StegoAnalysisResult:
     bitplane_entropies: Dict[str, Dict[str, Any]]
     chi_square_stats: Dict[str, Any]
     lsb_bit_density: float
-    stego_risk_score: float  # 0.0 (Clean) to 1.0 (High Probability Stego)
+    stego_risk_score: float
     stego_verdict: str
-    risk_level: str  # "LOW", "MEDIUM", "HIGH"
+    risk_level: str
     indicators: List[str]
     saved_bitplane_files: List[str] = field(default_factory=list)
 
@@ -39,7 +42,6 @@ class StegoInspector:
         p = Path(target_path)
         size_bytes = p.stat().st_size
 
-        # Run sandboxed decode tasks
         sandbox_res = SandboxRunner.run_decode_tasks(
             str(p),
             tasks=["dimensions", "entropy", "chi_square", "bitplane_slice"]
@@ -56,12 +58,9 @@ class StegoInspector:
 
         lsb_density = entropy_data.get("lsb_bit_density", 0.5)
 
-        # Calculate Stego Risk Indicators
         indicators: List[str] = []
         risk_score = 0.1
 
-        # 1. Evaluate LSB Shannon entropy across channels
-        # Natural images have lower entropy in LSBs than encrypted/compressed payloads (which hover around 1.0)
         high_entropy_lsb_channels = []
         for ch, planes in bitplane_data.items():
             plane_0 = planes.get("plane_0", {})
@@ -81,7 +80,6 @@ class StegoInspector:
                 f"High LSB Shannon entropy in {high_entropy_lsb_channels[0]} channel."
             )
 
-        # 2. Evaluate Chi-Square Pair-of-Values (PoV)
         uniform_pov_channels = []
         for ch, stat in chi_data.items():
             if stat.get("uniform_lsb_pairing_suspected"):
@@ -93,9 +91,6 @@ class StegoInspector:
                 f"Chi-Square Pair-of-Values test indicates artificial LSB equalization in {', '.join(uniform_pov_channels)} channels (PoV p-value anomaly)."
             )
 
-        # 3. Bitplane Progression Gradient
-        # Natural photos have a smooth gradient: Plane 7 (MSB, low entropy) -> Plane 0 (LSB, moderate entropy)
-        # Steganography exhibits sudden entropy spikes in Plane 0 or 1.
         for ch, planes in bitplane_data.items():
             ent_0 = planes.get("plane_0", {}).get("entropy", 0.0)
             ent_1 = planes.get("plane_1", {}).get("entropy", 0.0)
@@ -119,7 +114,6 @@ class StegoInspector:
             if not indicators:
                 indicators.append("Normal natural spatial variance; no artificial LSB pairing or entropy spikes detected.")
 
-        # Save bitplanes if requested
         saved_files = []
         if save_bitplanes_dir:
             out_dir = Path(save_bitplanes_dir)
@@ -151,13 +145,13 @@ class StegoInspector:
             base_name = src_path.stem
 
             for c_idx, c_name in enumerate(["red", "green", "blue"]):
-                for p in [0, 7]:  # Export LSB (0) and MSB (7)
+                for p in [0, 7]:
                     bit_plane = ((arr[..., c_idx] >> p) & 1) * 255
                     plane_img = Image.fromarray(bit_plane.astype(np.uint8), mode="L")
                     f_name = f"{base_name}_{c_name}_plane{p}.png"
                     dest = out_dir / f_name
                     plane_img.save(dest)
                     saved.append(str(dest))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to export bitplane images for %s: %s", src_path, e)
         return saved

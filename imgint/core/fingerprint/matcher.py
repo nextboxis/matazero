@@ -9,9 +9,6 @@ from imgint.core.fingerprint.corpus import ReferenceCorpus, CorpusEntry
 from imgint.core.model.finding import Finding, Confidence, Provenance
 
 
-# ---------------------------------------------------------------------------
-# Scoring weights for multi-signal composite matching
-# ---------------------------------------------------------------------------
 WEIGHT_DQT_LUMINANCE = 0.45
 WEIGHT_DQT_CHROMINANCE = 0.15
 WEIGHT_SEGMENT_ORDER = 0.15
@@ -19,9 +16,8 @@ WEIGHT_SUBSAMPLING = 0.10
 WEIGHT_DHT_TYPE = 0.10
 WEIGHT_SOF_TYPE = 0.05
 
-# Thresholds
 SIMILARITY_THRESHOLD = 0.75
-AMBIGUITY_MARGIN = 0.02   # If top candidates are within this margin, report ambiguity
+AMBIGUITY_MARGIN = 0.02
 
 
 @dataclass
@@ -57,32 +53,26 @@ class FingerprintMatcher:
                 metadata={"corpus_version": corpus.version},
             )
 
-        # Get luminance table (table 0)
         lum_table = next(
             (t for t in fingerprint.dqt_tables if t.table_id == 0),
             fingerprint.dqt_tables[0],
         )
         lum_vals = lum_table.values
 
-        # Get chrominance table (table 1) if available
         chrom_table = next(
             (t for t in fingerprint.dqt_tables if t.table_id == 1),
             None,
         )
         chrom_vals = chrom_table.values if chrom_table else None
 
-        # Determine SOF type from segment sequence
         file_sof_type = cls._extract_sof_type(fingerprint.segment_sequence)
 
-        # Determine DHT type (standard vs optimized)
         file_has_optimized_dht = any(
             not h.is_standard for h in fingerprint.dht_tables
         ) if fingerprint.dht_tables else False
 
-        # Determine primary APP marker
         file_primary_app = cls._extract_primary_app_marker(fingerprint.segment_sequence)
 
-        # Score all candidates
         candidates: List[CandidateMatch] = []
         for entry in corpus.entries:
             candidate = cls._score_candidate(
@@ -96,7 +86,6 @@ class FingerprintMatcher:
             )
             candidates.append(candidate)
 
-        # Sort by composite score descending
         candidates.sort(key=lambda c: c.composite_score, reverse=True)
 
         best = candidates[0] if candidates else None
@@ -119,7 +108,6 @@ class FingerprintMatcher:
                 },
             )
 
-        # Detect ambiguity: multiple candidates within AMBIGUITY_MARGIN of the best
         runners_up = [
             c for c in candidates[1:]
             if c.composite_score >= (best.composite_score - AMBIGUITY_MARGIN)
@@ -127,7 +115,6 @@ class FingerprintMatcher:
         ]
 
         if runners_up:
-            # Ambiguous match — report all candidates and their categories
             all_candidates_info = [cls._candidate_info(best)] + [
                 cls._candidate_info(c) for c in runners_up
             ]
@@ -165,7 +152,6 @@ class FingerprintMatcher:
                 },
             )
 
-        # Unambiguous match
         return Finding(
             name="encoder_attribution",
             value={
@@ -211,34 +197,28 @@ class FingerprintMatcher:
         file_primary_app: Optional[str],
     ) -> CandidateMatch:
         """Compute multi-signal weighted composite score for a single candidate."""
-        # 1. DQT Luminance similarity (primary signal)
         dqt_lum_score = cls._compute_table_similarity(lum_vals, entry.dqt_luminance_sample)
 
-        # 2. DQT Chrominance similarity (secondary signal)
-        dqt_chrom_score = 0.5  # neutral default when data unavailable
+        dqt_chrom_score = 0.5
         if chrom_vals and entry.dqt_chrominance_sample:
             dqt_chrom_score = cls._compute_table_similarity(chrom_vals, entry.dqt_chrominance_sample)
 
-        # 3. Segment order prefix match
         seg_score = cls._compute_segment_order_score(
             fingerprint.segment_sequence, entry.segment_prefix
         )
 
-        # 4. Subsampling match
-        sub_score = 0.5  # neutral default
+        sub_score = 0.5
         if fingerprint.subsampling:
             sub_score = 1.0 if fingerprint.subsampling.notation == entry.subsampling else 0.0
 
-        # 5. DHT type match (standard vs optimized)
-        dht_score = 0.5  # neutral default
+        dht_score = 0.5
         signals = entry.disambiguation_signals or {}
         entry_dht_type = signals.get("dht_type")
         if entry_dht_type and fingerprint.dht_tables:
             entry_is_optimized = (entry_dht_type == "optimized")
             dht_score = 1.0 if (file_has_optimized_dht == entry_is_optimized) else 0.0
 
-        # 6. SOF type match (SOF0 baseline vs SOF2 progressive)
-        sof_score = 0.5  # neutral default
+        sof_score = 0.5
         entry_sof_type = signals.get("sof_type")
         if entry_sof_type and file_sof_type:
             sof_score = 1.0 if file_sof_type == entry_sof_type else 0.0
@@ -269,11 +249,9 @@ class FingerprintMatcher:
         if len(table1) < 64 or len(table2) < 64:
             return 0.0
 
-        # Exact match
         if table1[:64] == table2[:64]:
             return 1.0
 
-        # Normalized Euclidean distance over log-values
         diffs = []
         for i in range(64):
             v1 = max(1, table1[i])
@@ -281,7 +259,6 @@ class FingerprintMatcher:
             diffs.append(abs(math.log(v1) - math.log(v2)))
 
         avg_diff = sum(diffs) / 64.0
-        # Map average log diff to similarity [0, 1]
         similarity = math.exp(-avg_diff * 1.5)
         return similarity
 
@@ -291,9 +268,8 @@ class FingerprintMatcher:
     ) -> float:
         """Score how well the file's segment order matches the corpus entry's prefix pattern."""
         if not entry_prefix or not file_sequence:
-            return 0.5  # neutral when data unavailable
+            return 0.5
 
-        # Check prefix match length
         max_match = min(len(file_sequence), len(entry_prefix))
         matched = 0
         for i in range(max_match):

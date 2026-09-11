@@ -3,6 +3,7 @@
 from __future__ import annotations
 import hashlib
 import json
+import logging
 import os
 import shutil
 import stat
@@ -10,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class EvidenceCustodyError(Exception):
@@ -49,8 +52,8 @@ class EvidenceStore:
                     for item in data.get("items", []):
                         ev = IngestedEvidence(**item)
                         self.items[ev.sha256] = ev
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to parse evidence store manifest at %s: %s", self.manifest_path, e)
 
     @staticmethod
     def compute_sha256(file_path: str | Path) -> str:
@@ -65,7 +68,6 @@ class EvidenceStore:
         if not src.exists():
             raise FileNotFoundError(f"Evidence file does not exist: {src}")
 
-        # GR-2.1: Compute SHA-256 before any other processing
         file_hash = self.compute_sha256(src)
         file_size = src.stat().st_size
         ext = src.suffix or ".bin"
@@ -74,27 +76,23 @@ class EvidenceStore:
         dest_original = self.originals_dir / f"{file_hash}{ext}"
         dest_working = self.working_dir / f"{file_hash}{ext}"
 
-        # GR-2.2: Make original read-only
         if not dest_original.exists():
             shutil.copy2(src, dest_original)
-            # Remove write permissions to protect original
             try:
                 dest_original.chmod(stat.S_IREAD | stat.S_IRGRP | stat.S_IROTH)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Could not set read-only permissions on %s: %s", dest_original, e)
 
-        # Create fresh working copy
         if dest_working.exists():
             try:
                 dest_working.chmod(stat.S_IREAD | stat.S_IWRITE | stat.S_IRGRP | stat.S_IROTH)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Could not reset write permissions on existing working copy %s: %s", dest_working, e)
         shutil.copy2(src, dest_working)
-        # Ensure working copy is readable and writable
         try:
             dest_working.chmod(stat.S_IREAD | stat.S_IWRITE | stat.S_IRGRP | stat.S_IROTH)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not set write permissions on working copy %s: %s", dest_working, e)
 
         ev = IngestedEvidence(
             original_source_path=str(src),

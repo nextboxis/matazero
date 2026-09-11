@@ -63,11 +63,10 @@ def resolve_scope(
     return AuthorizationScope.create_self_audit_scope()
 
 
-# Standard image file extensions for evidence discovery
 IMAGE_EXTENSIONS = {
-    ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".webp",
-    ".heic", ".heif", ".avif", ".bmp", ".gif",
-    ".docx", ".pptx",
+    ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tiff", ".tif",
+    ".cr2", ".nef", ".arw", ".dng", ".jxl", ".avif", ".bmp", ".gif",
+    ".pptx", ".ppsx", ".docx", ".xlsx", ".zip", ".odp", ".psd", ".svg",
 }
 
 
@@ -121,4 +120,40 @@ def format_error_panel(
         lines.append("[dim]Suggested Actions:[/dim]")
         for s in suggestions:
             lines.append(f"  [cyan]• {s}[/cyan]")
-    console.print(Panel("\\n".join(lines), title=f"[bold red][!] {title}[/bold red]", border_style="red"))
+    console.print(Panel("\n".join(lines), title=f"[bold red][!] {title}[/bold red]", border_style="red"))
+
+
+_expand_file_targets = expand_targets
+
+
+def _apply_record_filter(rec, filter_expr: Optional[str]) -> bool:
+    """Applies high-level forensic query filters to analysis records."""
+    if not filter_expr:
+        return True
+    expr = filter_expr.strip().lower()
+    if expr in ("has_gps", "gps"):
+        return any(f.name == "gps_coordinates_claimed" for f in rec.findings)
+    if expr in ("has_payload", "payload", "carve"):
+        return any(f.name == "trailing_data_detected" for f in rec.findings)
+    if expr in ("authentic=false", "modified", "tampered"):
+        return any(f.name == "authenticity_verdict" and f.value.get("is_authentic") is False for f in rec.findings)
+    if expr in ("authentic=true", "authentic"):
+        return any(f.name == "authenticity_verdict" and f.value.get("is_authentic") is True for f in rec.findings)
+    if expr.startswith("tier="):
+        try:
+            t_num = int(expr.split("=")[1])
+            return any(f.tier == t_num for f in rec.findings)
+        except Exception:
+            pass
+    return True
+
+
+def _apply_field_selection(rec, select_fields: Optional[str]) -> None:
+    """Filters metadata fields to only requested field names."""
+    if not select_fields:
+        return
+    names = {n.strip().lower() for n in select_fields.split(",") if n.strip()}
+    rec.fields = [
+        f for f in rec.fields
+        if f.name.lower() in names or (f.tag_id and f.tag_id.lower() in names)
+    ]

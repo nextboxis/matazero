@@ -3,7 +3,7 @@
 from __future__ import annotations
 import hashlib
 from pathlib import Path
-from typing import List, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple
 from imgint import __version__
 from imgint.core.model.finding import Finding, Confidence, Provenance
 from imgint.core.model.record import AnalysisRecord, Diagnostic, Field, MetadataBlock, StructuralUnit
@@ -75,7 +75,59 @@ class AnalysisPipeline:
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
-        # Enforce GR-1.1: Scope check
+        self._validate_scope()
+
+        file_sha256, working_path = self._ingest_evidence(path)
+
+        if self.audit_logger:
+            self.audit_logger.log(
+                action="file_analysis_started",
+                outcome="SUCCESS",
+                target_hash=file_sha256,
+                details={"file_path": str(path), "selected_tiers": list(self.selected_tiers)},
+            )
+
+        ForensicEventBus.get_default().publish(AnalysisStartedEvent(file_path=str(path)))
+
+        record = self._create_initial_record(path, working_path, file_sha256)
+        reader = BoundedReader(working_path)
+        try:
+            detected, units, blocks = self._detect_format_and_walk(path, reader, record)
+            if detected is None:
+                return record
+
+            all_fields = self._parse_metadata(blocks, record)
+
+            self._extract_fingerprints(detected.format_name, units, record)
+
+            self._extract_artefacts(reader, detected.format_name, units, blocks, record)
+
+            ctx = AnalysisContext(
+                file_path=working_path,
+                reader=reader,
+                format_name=detected.format_name,
+                structural_units=units,
+                metadata_blocks=blocks,
+                fields=all_fields,
+                existing_findings=record.findings,
+                diagnostics=record.diagnostics,
+                scope=self.scope,
+                allow_network=self.allow_network,
+                enable_ela=self.enable_ela,
+            )
+
+            self._run_analyzers(ctx, record)
+
+            self._evaluate_verdict(path, file_sha256, record)
+
+            self._finalize_analysis(path, file_sha256, record)
+
+            return record
+        finally:
+            reader.close()
+
+    def _validate_scope(self) -> None:
+        """Enforces scope presence and expiration (GR-1.1, GR-1.3)."""
         if self.scope is None:
             raise ScopeValidationError(
                 "No authorization scope loaded. Operation refused per SRD GR-1.1. "
@@ -87,29 +139,18 @@ class AnalysisPipeline:
                 "Operation refused per SRD GR-1.3."
             )
 
-        # Ingest into evidence store if active
-        # Use chunked streaming hash to avoid OOM on large RAW files
-        file_sha256 = self._compute_file_sha256(path)
-        working_path = path
-
+    def _ingest_evidence(self, path: Path) -> Tuple[str, Path]:
+        """Ingests evidence if evidence store is active; avoids duplicate SHA-256 computation."""
         if self.evidence_store:
             ingested = self.evidence_store.ingest(path)
-            file_sha256 = ingested.sha256
-            working_path = Path(ingested.working_copy_path)
+            return ingested.sha256, Path(ingested.working_copy_path)
+        return self._compute_file_sha256(path), path
 
-        if self.audit_logger:
-            self.audit_logger.log(
-                action="file_analysis_started",
-                outcome="SUCCESS",
-                target_hash=file_sha256,
-                details={"file_path": str(path), "selected_tiers": list(self.selected_tiers)},
-            )
-
-        # Publish AnalysisStartedEvent to ForensicEventBus
-        ForensicEventBus.get_default().publish(AnalysisStartedEvent(file_path=str(path)))
-
-        # Create record — use working_path for accurate size when evidence store is active
-        record = AnalysisRecord(
+    def _create_initial_record(
+        self, path: Path, working_path: Path, file_sha256: str
+    ) -> AnalysisRecord:
+        """Initializes the forensic AnalysisRecord with provenance baselines."""
+        return AnalysisRecord(
             file_path=str(path),
             file_size=working_path.stat().st_size,
             mime_type="application/octet-stream",
@@ -124,9 +165,10 @@ class AnalysisPipeline:
             ],
         )
 
-        reader = BoundedReader(working_path)
-
-        # Format detection (FR-1.1, FR-1.2)
+    def _detect_format_and_walk(
+        self, path: Path, reader: BoundedReader, record: AnalysisRecord
+    ) -> Tuple[Optional[Any], List[StructuralUnit], List[MetadataBlock]]:
+        """Detects file format and reads structural container units."""
         detected = FormatDetector.detect(reader)
         record.mime_type = detected.mime_type
 
@@ -137,13 +179,12 @@ class AnalysisPipeline:
                 source="format_detector",
                 offset=0,
             )
-            return record
+            return None, [], []
 
         mismatch_finding = FormatDetector.check_extension_mismatch(detected, path)
         if mismatch_finding:
             record.add_finding(mismatch_finding)
 
-        # Tier 1 & 2 Container Walk
         container_reader = self.container_registry.get_reader(detected.format_name)
         if not container_reader:
             record.add_diagnostic(
@@ -151,14 +192,18 @@ class AnalysisPipeline:
                 message=f"No container reader for format {detected.format_name}",
                 source="container_registry",
             )
-            return record
+            return None, [], []
 
         units, blocks, container_diags = container_reader.read(reader)
         record.structural_units = units
         record.metadata_blocks = blocks
         record.diagnostics.extend(container_diags)
+        return detected, units, blocks
 
-        # Standard Metadata Parsing (Tier 1)
+    def _parse_metadata(
+        self, blocks: List[MetadataBlock], record: AnalysisRecord
+    ) -> List[Field]:
+        """Parses Tier 1 standard metadata blocks into fields and findings."""
         all_fields: List[Field] = []
         if 1 in self.selected_tiers:
             for block in blocks:
@@ -168,134 +213,141 @@ class AnalysisPipeline:
                     all_fields.extend(fields)
                     record.fields.extend(fields)
                     for f in findings:
-                        if self.scope.is_analyzer_permitted(f.extractor, f.tier):
+                        if self.scope and self.scope.is_analyzer_permitted(f.extractor, f.tier):
                             record.add_finding(f)
                     record.diagnostics.extend(parse_diags)
+        return all_fields
 
-        # Tier 2: Structural Fingerprints
-        if 2 in self.selected_tiers and self.scope.is_analyzer_permitted("fingerprint_engine", 2):
-            dqt_tables = []
-            dht_tables = []
-            subsampling = None
-            restart_interval = None
+    def _extract_fingerprints(
+        self, detected_format: str, units: List[StructuralUnit], record: AnalysisRecord
+    ) -> None:
+        """Extracts Tier 2 encoder fingerprints and matches against reference corpus."""
+        if 2 not in self.selected_tiers or not (self.scope and self.scope.is_analyzer_permitted("fingerprint_engine", 2)):
+            return
 
-            for u in units:
-                if u.name == "DQT" and u.payload:
-                    dqt_tables.extend(DqtExtractor.extract_from_dqt_payload(u.payload))
-                elif u.name == "DHT" and u.payload:
-                    dht_tables.extend(DhtExtractor.extract_from_dht_payload(u.payload))
-                elif u.name.startswith("SOF") and u.payload:
-                    subsampling = SubsamplingExtractor.extract_from_sof_payload(u.payload)
-                elif u.name == "DRI" and u.payload and len(u.payload) >= 2:
-                    restart_interval = int.from_bytes(u.payload[:2], "big")
+        dqt_tables = []
+        dht_tables = []
+        subsampling = None
+        restart_interval = None
 
-            segment_sequence = SegmentOrderExtractor.extract_sequence(units)
-            fp = CompositeFingerprintBuilder.build(
-                format_name=detected.format_name,
-                dqt_tables=dqt_tables,
-                dht_tables=dht_tables,
-                subsampling=subsampling,
-                segment_sequence=segment_sequence,
-                restart_interval=restart_interval,
+        for u in units:
+            if u.name == "DQT" and u.payload:
+                dqt_tables.extend(DqtExtractor.extract_from_dqt_payload(u.payload))
+            elif u.name == "DHT" and u.payload:
+                dht_tables.extend(DhtExtractor.extract_from_dht_payload(u.payload))
+            elif u.name.startswith("SOF") and u.payload:
+                subsampling = SubsamplingExtractor.extract_from_sof_payload(u.payload)
+            elif u.name == "DRI" and u.payload and len(u.payload) >= 2:
+                restart_interval = int.from_bytes(u.payload[:2], "big")
+
+        segment_sequence = SegmentOrderExtractor.extract_sequence(units)
+        fp = CompositeFingerprintBuilder.build(
+            format_name=detected_format,
+            dqt_tables=dqt_tables,
+            dht_tables=dht_tables,
+            subsampling=subsampling,
+            segment_sequence=segment_sequence,
+            restart_interval=restart_interval,
+        )
+
+        record.add_finding(
+            Finding(
+                name="encoder_composite_fingerprint",
+                value=fp.to_dict(),
+                tier=2,
+                extractor="composite_fingerprint_builder",
+                confidence=Confidence.OBSERVED,
+                caveat=None,
+                provenance=Provenance(source_layer="fingerprint", extractor="composite_fingerprint_builder"),
             )
+        )
 
-            record.add_finding(
-                Finding(
-                    name="encoder_composite_fingerprint",
-                    value=fp.to_dict(),
-                    tier=2,
-                    extractor="composite_fingerprint_builder",
-                    confidence=Confidence.OBSERVED,
-                    caveat=None,
-                    provenance=Provenance(source_layer="fingerprint", extractor="composite_fingerprint_builder"),
-                )
-            )
+        match_finding = FingerprintMatcher.match(fp, self.corpus)
+        record.add_finding(match_finding)
 
-            # Match against Reference Corpus (FR-3.7, FR-3.8)
-            match_finding = FingerprintMatcher.match(fp, self.corpus)
-            record.add_finding(match_finding)
+    def _extract_artefacts(
+        self,
+        reader: BoundedReader,
+        detected_format: str,
+        units: List[StructuralUnit],
+        blocks: List[MetadataBlock],
+        record: AnalysisRecord,
+    ) -> None:
+        """Extracts Tier 3 embedded artefacts, trailing data, and container anomalies."""
+        if 3 not in self.selected_tiers or not (self.scope and self.scope.is_analyzer_permitted("artefact_extractor", 3)):
+            return
 
-        # Tier 3: Embedded Artefacts
-        if 3 in self.selected_tiers and self.scope.is_analyzer_permitted("artefact_extractor", 3):
-            # Check IFD1 thumbnail
-            for b in blocks:
-                if b.kind == "EXIF":
-                    thumb = ThumbnailExtractor.extract_from_exif_block(b)
-                    if thumb:
-                        record.add_finding(
-                            Finding(
-                                name="exif_thumbnail_extracted",
-                                value={"offset": thumb.offset, "length": thumb.length, "format": thumb.format_type},
-                                tier=3,
-                                extractor="thumbnail_extractor",
-                                confidence=Confidence.OBSERVED,
-                                caveat=None,
-                                provenance=Provenance(source_layer="artefact", extractor="thumbnail_extractor", offset=thumb.offset, length=thumb.length),
-                            )
-                        )
-                elif b.kind == "MPF":
-                    mpf_images = MpfExtractor.extract_from_mpf_block(b)
-                    if mpf_images:
-                        record.add_finding(
-                            Finding(
-                                name="mpf_secondary_images",
-                                value={"count": len(mpf_images)},
-                                tier=3,
-                                extractor="mpf_extractor",
-                                confidence=Confidence.OBSERVED,
-                                caveat=None,
-                                provenance=Provenance(source_layer="artefact", extractor="mpf_extractor", offset=b.offset, length=b.length),
-                            )
-                        )
-
-            # Trailing data
-            for u in units:
-                if u.name == "TRAILING_DATA":
-                    trailing_info = TrailingDataExtractor.analyze(u, reader.get_all_bytes())
+        for b in blocks:
+            if b.kind == "EXIF":
+                thumb = ThumbnailExtractor.extract_from_exif_block(b)
+                if thumb:
                     record.add_finding(
                         Finding(
-                            name="trailing_data_detected",
-                            value={
-                                "offset": trailing_info.offset,
-                                "length": trailing_info.length,
-                                "shannon_entropy": trailing_info.shannon_entropy,
-                                "detected_payload_type": trailing_info.detected_payload_type,
-                                "preview_hex": trailing_info.preview_hex,
-                            },
+                            name="exif_thumbnail_extracted",
+                            value={"offset": thumb.offset, "length": thumb.length, "format": thumb.format_type},
                             tier=3,
-                            extractor="trailing_data_extractor",
+                            extractor="thumbnail_extractor",
                             confidence=Confidence.OBSERVED,
                             caveat=None,
-                            provenance=Provenance(source_layer="artefact", extractor="trailing_data_extractor", offset=trailing_info.offset, length=trailing_info.length),
+                            provenance=Provenance(
+                                source_layer="artefact", extractor="thumbnail_extractor", offset=thumb.offset, length=thumb.length
+                            ),
+                        )
+                    )
+            elif b.kind == "MPF":
+                mpf_images = MpfExtractor.extract_from_mpf_block(b)
+                if mpf_images:
+                    record.add_finding(
+                        Finding(
+                            name="mpf_secondary_images",
+                            value={"count": len(mpf_images)},
+                            tier=3,
+                            extractor="mpf_extractor",
+                            confidence=Confidence.OBSERVED,
+                            caveat=None,
+                            provenance=Provenance(
+                                source_layer="artefact", extractor="mpf_extractor", offset=b.offset, length=b.length
+                            ),
                         )
                     )
 
-            # Container anomalies
-            anomalies = ContainerAnomalyDetector.detect_anomalies(units, detected.format_name)
-            for a in anomalies:
-                record.add_finding(a)
+        for u in units:
+            if u.name == "TRAILING_DATA":
+                trailing_info = TrailingDataExtractor.analyze(u, reader.get_all_bytes())
+                record.add_finding(
+                    Finding(
+                        name="trailing_data_detected",
+                        value={
+                            "offset": trailing_info.offset,
+                            "length": trailing_info.length,
+                            "shannon_entropy": trailing_info.shannon_entropy,
+                            "detected_payload_type": trailing_info.detected_payload_type,
+                            "preview_hex": trailing_info.preview_hex,
+                        },
+                        tier=3,
+                        extractor="trailing_data_extractor",
+                        confidence=Confidence.OBSERVED,
+                        caveat=None,
+                        provenance=Provenance(
+                            source_layer="artefact",
+                            extractor="trailing_data_extractor",
+                            offset=trailing_info.offset,
+                            length=trailing_info.length,
+                        ),
+                    )
+                )
 
-        # Context for Tiers 4-7 Analysers
-        ctx = AnalysisContext(
-            file_path=working_path,
-            reader=reader,
-            format_name=detected.format_name,
-            structural_units=units,
-            metadata_blocks=blocks,
-            fields=all_fields,
-            existing_findings=record.findings,
-            diagnostics=record.diagnostics,
-            scope=self.scope,
-            allow_network=self.allow_network,
-            enable_ela=self.enable_ela,
-        )
+        anomalies = ContainerAnomalyDetector.detect_anomalies(units, detected_format)
+        for a in anomalies:
+            record.add_finding(a)
 
-        # Execute permitted Tier 4-7 analysers & dynamic skills
+    def _run_analyzers(self, ctx: AnalysisContext, record: AnalysisRecord) -> None:
+        """Executes permitted Tier 4-7 analyzers, dynamic skills, and optional Ollama vision."""
         skill_reg = SkillRegistry.get_default()
         for tier in (4, 5, 6, 7):
             if tier in self.selected_tiers:
                 for analyzer in self.analyzer_registry.get_analyzers_for_tier(tier):
-                    if self.scope.is_analyzer_permitted(analyzer.id, tier):
+                    if self.scope and self.scope.is_analyzer_permitted(analyzer.id, tier):
                         try:
                             f_list, d_list = analyzer.analyze(ctx)
                             for f in f_list:
@@ -307,8 +359,7 @@ class AnalysisPipeline:
                                 message=f"Analyzer {analyzer.id} failed: {e}",
                                 source=analyzer.id,
                             )
-                # Dynamic skills for this tier
-                for skill in skill_reg.get_skills_for_tier(tier, detected.format_name):
+                for skill in skill_reg.get_skills_for_tier(tier, ctx.format_name):
                     try:
                         f_list, d_list = skill.analyze(ctx)
                         for f in f_list:
@@ -321,7 +372,6 @@ class AnalysisPipeline:
                             source=skill.id,
                         )
 
-        # Tier 7: Optional Ollama Local Vision Inspection
         if 7 in self.selected_tiers and self.ollama_model:
             try:
                 ai_findings, ai_diagnostics = OllamaVisionAnalyzer.analyze(ctx, self.ollama_model)
@@ -335,12 +385,14 @@ class AnalysisPipeline:
                     source="ollama_vision_analyzer",
                 )
 
-        # Update data stream hash on record
         for f in record.findings:
             if f.name == "image_data_stream_sha256":
                 record.data_stream_sha256 = f.value
 
-        # Compute Authenticity and Integrity Verdict
+    def _evaluate_verdict(
+        self, path: Path, file_sha256: str, record: AnalysisRecord
+    ) -> None:
+        """Computes and attaches the Authenticity and Integrity verdict."""
         verdict = AuthenticityEvaluator.evaluate(record)
         record.authenticity_verdict = verdict.to_dict()
         record.add_finding(
@@ -365,7 +417,6 @@ class AnalysisPipeline:
             )
         )
 
-        # Publish VerdictEvaluatedEvent
         ForensicEventBus.get_default().publish(
             VerdictEvaluatedEvent(
                 file_path=str(path),
@@ -376,7 +427,10 @@ class AnalysisPipeline:
             )
         )
 
-        # GR-2.3: Re-verify evidence custody
+    def _finalize_analysis(
+        self, path: Path, file_sha256: str, record: AnalysisRecord
+    ) -> None:
+        """Performs custody verification, audit logging, and completion event publishing."""
         if self.evidence_store:
             self.evidence_store.verify_all_originals()
 
@@ -388,7 +442,6 @@ class AnalysisPipeline:
                 details={"findings_count": len(record.findings)},
             )
 
-        # Publish AnalysisCompletedEvent
         ForensicEventBus.get_default().publish(
             AnalysisCompletedEvent(
                 file_path=str(path),
@@ -398,16 +451,7 @@ class AnalysisPipeline:
             )
         )
 
-        return record
-
     @staticmethod
-    def _compute_file_sha256(path: Path) -> str:
+    def _compute_file_sha256(path: Path | str) -> str:
         """Compute SHA-256 of a file using chunked streaming to avoid OOM on large files."""
-        h = hashlib.sha256()
-        with open(path, "rb") as f:
-            while True:
-                chunk = f.read(1024 * 1024)  # 1 MB chunks
-                if not chunk:
-                    break
-                h.update(chunk)
-        return h.hexdigest()
+        return EvidenceStore.compute_sha256(path)

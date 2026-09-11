@@ -94,7 +94,6 @@ class PngContainerReader(ContainerReader):
             )
             units.append(unit)
 
-            # Metadata blocks in PNG
             if chunk_type == "eXIf":
                 blocks.append(
                     MetadataBlock(
@@ -140,7 +139,6 @@ class PngContainerReader(ContainerReader):
 
             if chunk_type == "IEND":
                 iend_seen = True
-                # Check for trailing data after IEND chunk
                 if offset < size:
                     trailing_len = size - offset
                     units.append(

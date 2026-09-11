@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -39,15 +40,14 @@ class SandboxRunner:
             payload.update(kwargs)
         input_json = json.dumps(payload)
 
-        # Ensure child process can always locate imgint package
         repo_root = str(Path(__file__).parent.parent.parent.parent.resolve())
-        import os
         env = os.environ.copy()
         existing_pythonpath = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = f"{repo_root}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else repo_root
 
         cmd = [sys.executable, "-m", "imgint.core.sandbox.worker"]
 
+        proc: Optional[subprocess.Popen] = None
         try:
             proc = subprocess.Popen(
                 cmd,
@@ -68,8 +68,18 @@ class SandboxRunner:
             result = json.loads(stdout_str.strip())
             return result
         except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.communicate()
+            if proc:
+                try:
+                    proc.kill()
+                    proc.communicate()
+                except Exception:
+                    pass
             return {"success": False, "error": f"Child decode timed out after {timeout}s"}
         except Exception as e:
+            if proc and proc.poll() is None:
+                try:
+                    proc.kill()
+                    proc.communicate()
+                except Exception:
+                    pass
             return {"success": False, "error": f"Sandbox execution exception: {e}"}

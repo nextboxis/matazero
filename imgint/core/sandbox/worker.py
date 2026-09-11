@@ -21,6 +21,7 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
         import imagehash
         import numpy as np
 
+        img = None
         if file_path and os.path.exists(file_path):
             img = Image.open(file_path)
         elif raw_bytes:
@@ -58,7 +59,6 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
         if "dominant_colors" in tasks:
             try:
-                # Downsample for dominant color calculation
                 small = img_rgb.resize((64, 64))
                 stat = ImageStat.Stat(small)
                 mean_rgb = [int(x) for x in stat.mean[:3]]
@@ -73,7 +73,6 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
         if "entropy" in tasks:
             try:
                 arr = np.array(img_rgb)
-                # LSB entropy estimation
                 lsb_arr = arr & 1
                 lsb_mean = float(np.mean(lsb_arr))
                 results["tasks"]["entropy"] = {
@@ -85,7 +84,6 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
         if "ela" in tasks:
             try:
-                # Error Level Analysis simulation (re-compress at 90 and calculate diff)
                 buffer = io.BytesIO()
                 img_rgb.save(buffer, "JPEG", quality=90)
                 buffer.seek(0)
@@ -102,7 +100,6 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
         if "fft_frequency" in tasks:
             try:
-                # 2D Fast Fourier Transform Power Spectrum for Synthetic / GenAI Artifact Detection
                 arr = np.array(img_rgb)
                 gray = np.dot(arr[..., :3], [0.2989, 0.5870, 0.1140])
                 h_crop = min(512, height)
@@ -112,7 +109,6 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
                 mag = np.abs(f_shift)
                 cy, cx = h_crop // 2, w_crop // 2
                 r_core = min(cy, cx) // 4
-                # Mask low frequencies in center to analyze high-frequency grid peaks
                 y_coords, x_coords = np.ogrid[:h_crop, :w_crop]
                 dist_from_center = np.sqrt((x_coords - cx) ** 2 + (y_coords - cy) ** 2)
                 high_freq_mask = dist_from_center > r_core
@@ -133,7 +129,6 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
         if "chi_square" in tasks:
             try:
-                # Chi-Square (PoV) Steganography Analysis on LSBs
                 arr = np.array(img_rgb)
                 chi_stats = {}
                 for c_idx, c_name in enumerate(["red", "green", "blue"]):
@@ -159,7 +154,6 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
         if "bitplane_slice" in tasks:
             try:
-                # Bitplane slicing entropy for planes 0 (LSB) through 7 (MSB)
                 arr = np.array(img_rgb)
                 bitplane_data = {}
                 for c_idx, c_name in enumerate(["red", "green", "blue"]):
@@ -280,6 +274,11 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
     except Exception as e:
         return {"success": False, "error": str(e)}
+    finally:
+        if img is not None:
+            img.close()
+        if 'img_rgb' in locals() and hasattr(img_rgb, 'close'):
+            img_rgb.close()
 
     return results
 

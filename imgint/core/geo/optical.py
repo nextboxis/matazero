@@ -17,8 +17,8 @@ class OpticalViewingCone:
     """Represents a camera's directional viewing frustum projected onto the earth's surface."""
     origin_lat: float
     origin_lon: float
-    heading_deg: float  # Compass orientation (0 - 360)
-    heading_ref: str  # 'T' (True North) or 'M' (Magnetic)
+    heading_deg: float
+    heading_ref: str
     focal_length_mm: Optional[float]
     focal_length_35mm: Optional[float]
     hfov_degrees: float
@@ -27,7 +27,7 @@ class OpticalViewingCone:
     viewing_distance_meters: float
     left_bearing_deg: float
     right_bearing_deg: float
-    cone_polygon_coords: List[Tuple[float, float]]  # List of (lat, lon) defining the viewing sector
+    cone_polygon_coords: List[Tuple[float, float]]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -54,10 +54,9 @@ class OpticalRayCaster:
     Computes camera optical geometry and geodesic viewing cones.
     """
 
-    # Standard full-frame 35mm sensor dimensions (36mm x 24mm, diagonal = 43.27mm)
     SENSOR_WIDTH_35MM = 36.0
     SENSOR_HEIGHT_35MM = 24.0
-    SENSOR_DIAG_35MM = math.sqrt(36.0**2 + 24.0**2)  # ~43.267mm
+    SENSOR_DIAG_35MM = math.sqrt(36.0**2 + 24.0**2)
 
     @classmethod
     def compute_fov_from_focal_length(
@@ -70,26 +69,22 @@ class OpticalRayCaster:
         Computes (HFOV, VFOV, DFOV) in degrees from 35mm equivalent focal length or physical focal length.
         Defaults to standard 50mm human perspective if focal length is unavailable.
         """
-        # Determine effective 35mm focal length
-        f_eff: float = 50.0  # Default normal lens (~40 deg HFOV)
+        f_eff: float = 50.0
 
         if focal_length_35mm and focal_length_35mm > 0:
             f_eff = float(focal_length_35mm)
         elif focal_length_mm and focal_length_mm > 0:
             if sensor_width_mm and sensor_width_mm > 0:
-                # Calculate from physical sensor width
                 crop_factor = cls.SENSOR_WIDTH_35MM / sensor_width_mm
                 f_eff = float(focal_length_mm) * crop_factor
             else:
-                # Assume standard smartphone crop factor ~5.6x if focal length < 10mm, else full-frame
                 if focal_length_mm < 10.0:
-                    f_eff = float(focal_length_mm) * 5.6  # Typical smartphone main camera (~24-28mm eq)
+                    f_eff = float(focal_length_mm) * 5.6
                 else:
                     f_eff = float(focal_length_mm)
 
-        f_eff = max(1.0, f_eff)  # Prevent division by zero
+        f_eff = max(1.0, f_eff)
 
-        # HFOV = 2 * arctan(width / (2 * f))
         hfov_rad = 2.0 * math.atan(cls.SENSOR_WIDTH_35MM / (2.0 * f_eff))
         vfov_rad = 2.0 * math.atan(cls.SENSOR_HEIGHT_35MM / (2.0 * f_eff))
         dfov_rad = 2.0 * math.atan(cls.SENSOR_DIAG_35MM / (2.0 * f_eff))
@@ -111,7 +106,7 @@ class OpticalRayCaster:
         """
         Computes the destination coordinate given an origin, bearing, and distance (WGS-84 great circle).
         """
-        R = 6371008.8  # Earth mean radius in meters
+        R = 6371008.8
         d_div_r = distance_meters / R
         brng_rad = math.radians(bearing_deg)
         lat_rad = math.radians(lat)
@@ -151,11 +146,8 @@ class OpticalRayCaster:
         left_bearing = (heading_deg - half_hfov) % 360.0
         right_bearing = (heading_deg + half_hfov) % 360.0
 
-        # Build sector polygon: [Origin -> Left Arc ... Right Arc -> Origin]
         polygon: List[Tuple[float, float]] = [(lat, lon)]
 
-        # Sample points along the arc from left to right bearing
-        # Handle wrap-around
         span = hfov
         for i in range(num_arc_points + 1):
             fraction = i / float(num_arc_points)
@@ -163,7 +155,6 @@ class OpticalRayCaster:
             pt = cls.destination_point(lat, lon, cur_bearing, viewing_distance_meters)
             polygon.append(pt)
 
-        # Close polygon
         polygon.append((lat, lon))
 
         return OpticalViewingCone(

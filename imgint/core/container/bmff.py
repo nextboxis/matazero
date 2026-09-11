@@ -42,13 +42,11 @@ class BmffContainerReader(ContainerReader):
 
             header_len = 8
             if box_size == 1:
-                # 64-bit large size
                 if offset + 16 > size:
                     break
                 box_size = struct.unpack(">Q", reader.read_bytes(offset + 8, 8))[0]
                 header_len = 16
             elif box_size == 0:
-                # Extends to EOF
                 box_size = size - offset
 
             if box_size < header_len or offset + box_size > size:
@@ -73,7 +71,6 @@ class BmffContainerReader(ContainerReader):
                 )
             )
 
-            # Check for embedded metadata in item data or meta boxes
             if box_type == "Exif":
                 raw_exif = payload_bytes
                 if raw_exif.startswith(b"Exif\x00\x00"):

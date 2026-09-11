@@ -5,15 +5,14 @@ import hashlib
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
-# Standard ISO/IEC 10918-1 baseline DC and AC luminance/chrominance tables counts
 STD_LUMINANCE_DC_COUNTS = [0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0]
 STD_CHROMINANCE_DC_COUNTS = [0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
 
 
 @dataclass
 class HuffmanTable:
-    table_class: int  # 0 = DC, 1 = AC
-    destination_id: int  # 0 = Luminance, 1 = Chrominance
+    table_class: int
+    destination_id: int
     counts: List[int]
     symbols: List[int]
     is_standard: bool
@@ -21,7 +20,6 @@ class HuffmanTable:
     class_name: str
 
 
-# Alias for shorthand / test compatibility
 DHTTable = HuffmanTable
 
 
@@ -53,7 +51,6 @@ class DhtExtractor:
             symbols = list(payload[offset : offset + symbol_count])
             offset += symbol_count
 
-            # Compare against standard baseline counts
             is_standard = False
             if table_class == 0:
                 if destination_id == 0 and counts == STD_LUMINANCE_DC_COUNTS:

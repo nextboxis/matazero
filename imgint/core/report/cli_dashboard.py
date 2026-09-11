@@ -24,7 +24,6 @@ class CliDashboard:
     @classmethod
     def render_summary_dashboard(cls, record: AnalysisRecord, console: Console) -> None:
         """Renders an intuitive, high-readability executive summary dashboard in the terminal."""
-        # 1. Header Banner
         header_text = Text()
         header_text.append(" TARGET EVIDENCE: ", style="bold white on blue")
         header_text.append(f" {record.file_path} ", style="bold white")
@@ -35,7 +34,6 @@ class CliDashboard:
 
         console.print(Panel(header_text, title="[bold]matazero Evidence Overview[/bold]", border_style="blue"))
 
-        # 2. Authenticity & Integrity Verdict Card
         verdict = record.authenticity_verdict or {}
         is_auth = verdict.get("is_authentic")
         conf_pct = int(verdict.get("confidence_score", 0.5) * 100)
@@ -71,12 +69,10 @@ class CliDashboard:
 
         console.print(Panel(verdict_content, title="[bold]Integrity & Authenticity Verdict[/bold]", border_style=v_border))
 
-        # 3. Two-Column Information Cards: Device Fingerprint & Geolocation
         left_table = Table(show_header=False, box=None, padding=(0, 1))
         left_table.add_column("Key", style="bold cyan", width=18)
         left_table.add_column("Value", style="white")
 
-        # Camera & Device Fields
         make = next((f.value for f in record.fields if f.name.lower() in ("make", "camera_make")), None)
         model = next((f.value for f in record.fields if f.name.lower() in ("model", "camera_model")), None)
         software = next((f.value for f in record.fields if f.name.lower() in ("software", "processing_software")), None)
@@ -93,7 +89,6 @@ class CliDashboard:
         if dim_f and isinstance(dim_f, dict):
             left_table.add_row("Dimensions:", f"{dim_f.get('width')} x {dim_f.get('height')} px ({dim_f.get('mode', '')})")
 
-        # Encoder Fingerprint
         enc_f = next((f.value for f in record.findings if f.name == "encoder_composite_fingerprint"), None)
         if enc_f and isinstance(enc_f, dict):
             qs = enc_f.get("estimated_qualities", [])
@@ -103,7 +98,6 @@ class CliDashboard:
 
         device_panel = Panel(left_table, title="[bold]Hardware & Device Profile[/bold]", border_style="bright_blue")
 
-        # Geolocation Card
         right_table = Table(show_header=False, box=None, padding=(0, 1))
         right_table.add_column("Key", style="bold green", width=18)
         right_table.add_column("Value", style="white")
@@ -152,12 +146,10 @@ class CliDashboard:
 
         console.print(Columns([device_panel, geo_panel], equal=True))
 
-        # 4. Hidden Data, Embedded Media & Threat Alerts
         threats_table = Table(show_header=True, header_style="bold magenta", expand=True)
         threats_table.add_column("Category", width=22)
         threats_table.add_column("Status / Findings", style="white")
 
-        # Check Carved Payloads
         trailing_units = [u for u in record.structural_units if "TRAILING" in u.name or "CARVED" in u.name]
         if trailing_units:
             t_msg = f"[bold red]✖ FOUND {len(trailing_units)} TRAILING DATA STREAM(S)[/bold red]: " + ", ".join(
@@ -167,7 +159,6 @@ class CliDashboard:
         else:
             threats_table.add_row("Trailing Data", "[green]✔ Clean (No unparsed trailing bytes after EOF)[/green]")
 
-        # Check Embedded Images / Media (PPTX / DOCX / Previews / Thumbnails)
         media_units = [u for u in record.structural_units if "EMBEDDED_IMAGE" in u.name or "PREVIEW" in u.name or "THUMBNAIL" in u.name]
         if media_units:
             m_msg = f"[bold cyan]Found {len(media_units)} embedded asset(s)[/bold cyan]: " + ", ".join(
@@ -179,7 +170,6 @@ class CliDashboard:
         else:
             threats_table.add_row("Embedded Media", "[dim]No secondary embedded thumbnails or slide images[/dim]")
 
-        # Check LSB Stego Anomalies
         lsb_f = next((f.value for f in record.findings if f.name == "lsb_entropy_screening"), None)
         if lsb_f and isinstance(lsb_f, dict) and lsb_f.get("lsb_anomaly"):
             threats_table.add_row("[bold yellow]LSB Stego Anomaly[/bold yellow]", f"[bold yellow]▲ High bit density ({lsb_f.get('lsb_bit_density')}) flagged[/bold yellow]")
@@ -188,7 +178,6 @@ class CliDashboard:
 
         console.print(Panel(threats_table, title="[bold]Hidden Data, Embedded Media & Threat Screening[/bold]", border_style="magenta"))
 
-        # 5. Top Extracted Metadata Table
         if record.fields:
             meta_table = Table(title=f"Extracted Metadata Sample ({len(record.fields)} Total Fields)", expand=True)
             meta_table.add_column("Field Name", style="bold cyan", width=25)
@@ -211,17 +200,14 @@ class CliDashboard:
         """Renders an exhaustive hierarchical forensic tree breakdown."""
         tree = Tree(f"[bold white on blue] matazero DEEP FORENSIC TREE [/bold white on blue] — [bold]{record.file_path}[/bold] ({record.file_size:,} B)")
 
-        # 1. Container Structure
         c_tree = tree.add("[bold cyan]1. Container Structure & Units[/bold cyan]")
         for u in record.structural_units:
             c_tree.add(f"[bold]{u.name}[/bold] (Offset: 0x{u.offset:X}, Length: {u.length:,} B) — {u.description}")
 
-        # 2. Metadata Blocks
         b_tree = tree.add(f"[bold yellow]2. Metadata Blocks ({len(record.metadata_blocks)} blocks)[/bold yellow]")
         for b in record.metadata_blocks:
             b_tree.add(f"[bold]{b.kind}[/bold] @ 0x{b.offset:X} ({b.length:,} B) — Source: {b.source_unit}")
 
-        # 3. Extracted Metadata Fields
         f_tree = tree.add(f"[bold green]3. Complete Metadata Field Inventory ({len(record.fields)} fields)[/bold green]")
         for fld in record.fields:
             off_str = f"Tag @ 0x{fld.offset:X}" if fld.offset is not None else ""
@@ -230,7 +216,6 @@ class CliDashboard:
             loc_disp = f" ({locs})" if locs else ""
             f_tree.add(f"[bold]{fld.name}[/bold] [{fld.standard}]{loc_disp} = [cyan]{fld.value}[/cyan]")
 
-        # 4. Forensic Findings by Tier
         findings_tree = tree.add("[bold magenta]4. Forensic Findings (Tiers 1–7)[/bold magenta]")
         for t in range(1, 8):
             tier_findings = [f for f in record.findings if f.tier == t]
@@ -239,7 +224,6 @@ class CliDashboard:
                 for f in tier_findings:
                     t_branch.add(f"[bold]{f.name}[/bold] [{f.confidence.value}] — Extractor: {f.extractor}\nValue: {f.value}")
 
-        # 5. Hashes & Integrity
         h_tree = tree.add("[bold white]5. Cryptographic Hashes & Integrity[/bold white]")
         h_tree.add(f"File SHA-256: {record.sha256}")
         if record.data_stream_sha256:

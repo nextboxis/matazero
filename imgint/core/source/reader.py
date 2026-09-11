@@ -1,6 +1,7 @@
 """Bounded, windowed binary reader with strict bounds checking per SRD NFR-1.4 - NFR-1.6."""
 
 from __future__ import annotations
+import mmap
 import struct
 from pathlib import Path
 from typing import Optional, Union
@@ -17,24 +18,68 @@ class BoundedReader:
     def __init__(
         self,
         source: Union[bytes, str, Path],
-        max_read_size: int = 16 * 1024 * 1024,  # 16 MB max per chunk
+        max_read_size: int = 16 * 1024 * 1024,
+        max_file_size: int = 256 * 1024 * 1024,
         max_units: int = 4096,
         max_depth: int = 16,
     ):
+        self._file_obj = None
+        self._mmap = None
         if isinstance(source, bytes):
-            self._buffer = source
+            self._buffer: Union[bytes, mmap.mmap] = source
             self._path: Optional[Path] = None
             self._size = len(source)
         else:
             self._path = Path(source)
             self._size = self._path.stat().st_size
-            with open(self._path, "rb") as f:
-                self._buffer = f.read()
+            if self._size > max_file_size:
+                raise SourceBoundsError(
+                    f"File size {self._size:,} bytes exceeds maximum allowed "
+                    f"{max_file_size:,} bytes. Use max_file_size parameter to override."
+                )
+            if self._size == 0:
+                self._buffer = b""
+            else:
+                try:
+                    self._file_obj = open(self._path, "rb")
+                    self._mmap = mmap.mmap(self._file_obj.fileno(), 0, access=mmap.ACCESS_READ)
+                    self._buffer = self._mmap
+                except Exception:
+                    if self._file_obj and not self._file_obj.closed:
+                        self._file_obj.close()
+                        self._file_obj = None
+                    with open(self._path, "rb") as f:
+                        self._buffer = f.read()
+
         self.max_read_size = max_read_size
+        self.max_file_size = max_file_size
         self.max_units = max_units
         self.max_depth = max_depth
         self.unit_count = 0
         self.current_depth = 0
+
+    def close(self) -> None:
+        if self._mmap is not None and not self._mmap.closed:
+            try:
+                self._mmap.close()
+            except Exception:
+                pass
+            self._mmap = None
+        if self._file_obj is not None and not self._file_obj.closed:
+            try:
+                self._file_obj.close()
+            except Exception:
+                pass
+            self._file_obj = None
+
+    def __enter__(self) -> BoundedReader:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        self.close()
 
     @property
     def size(self) -> int:
@@ -45,18 +90,18 @@ class BoundedReader:
         return self._path
 
     def check_unit_budget(self) -> None:
-        self.unit_count += 1
-        if self.unit_count > self.max_units:
+        if self.unit_count + 1 > self.max_units:
             raise SourceBoundsError(
                 f"Exceeded maximum structural unit count ({self.max_units}). Possible container recursion bomb."
             )
+        self.unit_count += 1
 
     def enter_depth(self) -> None:
-        self.current_depth += 1
-        if self.current_depth > self.max_depth:
+        if self.current_depth + 1 > self.max_depth:
             raise SourceBoundsError(
                 f"Exceeded maximum container recursion depth ({self.max_depth})."
             )
+        self.current_depth += 1
 
     def exit_depth(self) -> None:
         if self.current_depth > 0:
@@ -79,7 +124,7 @@ class BoundedReader:
             raise SourceBoundsError(
                 f"Attempted allocation {length} exceeds maximum safety cap {self.max_read_size}"
             )
-        return self._buffer[offset : offset + length]
+        return bytes(self._buffer[offset : offset + length])
 
     def read_u8(self, offset: int) -> int:
         b = self.read_bytes(offset, 1)
@@ -118,4 +163,4 @@ class BoundedReader:
         return self._buffer.find(sub, start, end)
 
     def get_all_bytes(self) -> bytes:
-        return self._buffer
+        return bytes(self._buffer)

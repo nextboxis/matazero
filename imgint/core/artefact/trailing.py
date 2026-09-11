@@ -14,7 +14,7 @@ class TrailingDataInfo:
     offset: int
     length: int
     shannon_entropy: float
-    detected_payload_type: str  # "ZIP Archive", "RAR Archive", "Executable (PE/ELF)", "Plain Text", "Encrypted / Random Bytes", etc.
+    detected_payload_type: str
     preview_hex: str
 
 
@@ -66,7 +66,6 @@ class TrailingDataExtractor:
         if len(data) >= 3 and data[:3] == b"\x1f\x8b\x08":
             return "GZIP Compressed Stream"
 
-        # Check if plain text
         try:
             sample = data[:min(len(data), 256)].decode("ascii")
             if all(c.isprintable() or c in "\r\n\t " for c in sample):

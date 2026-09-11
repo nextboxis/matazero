@@ -33,7 +33,6 @@ class NDJSONGeoIngester:
         except Exception:
             return None
 
-        # 1. GeoJSON Feature format
         if obj.get("type") == "Feature" or "geometry" in obj:
             geom = obj.get("geometry") or {}
             coords = geom.get("coordinates")
@@ -42,7 +41,6 @@ class NDJSONGeoIngester:
             lon, lat = float(coords[0]), float(coords[1])
             props = obj.get("properties") or {}
 
-            # Name extraction
             name = (
                 props.get("name")
                 or (props.get("names", {}).get("primary") if isinstance(props.get("names"), dict) else None)
@@ -70,7 +68,6 @@ class NDJSONGeoIngester:
                 "subtype": subtype,
             }
 
-        # 2. Flat dictionary format
         name = (obj.get("name") or obj.get("city") or obj.get("place_name") or "").strip()
         lat = obj.get("lat") or obj.get("latitude")
         lon = obj.get("lon") or obj.get("longitude") or obj.get("lng")
@@ -157,7 +154,6 @@ class NDJSONGeoIngester:
                 if max_records and added_count >= max_records:
                     break
 
-        # Sort and write back
         existing_places.sort(key=lambda x: (x.get("country", ""), x.get("admin1", ""), x.get("name", "")))
         output_data = {
             "dataset_version": "2026.09.4-enhanced-ndjson-v5",

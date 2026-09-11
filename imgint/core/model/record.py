@@ -9,7 +9,7 @@ from imgint.core.model.finding import Finding
 
 @dataclass
 class Diagnostic:
-    level: str  # "info", "warning", "error"
+    level: str
     message: str
     source: str
     offset: Optional[int] = None
@@ -50,7 +50,7 @@ class StructuralUnit:
 
 @dataclass
 class MetadataBlock:
-    kind: str  # "EXIF", "XMP", "IPTC", "ICC", "C2PA", "PNG_TEXT", "JFIF", etc.
+    kind: str
     offset: int
     length: int
     raw_bytes: bytes
@@ -59,16 +59,16 @@ class MetadataBlock:
 
 @dataclass
 class Field:
-    standard: str  # "EXIF", "XMP", "IPTC", "ICC", "PNG", etc.
+    standard: str
     name: str
     value: Any
     raw_value: Any
     value_type: str
     tag_id: Optional[str] = None
     description: Optional[str] = None
-    offset: Optional[int] = None        # Tag entry / header offset in file
-    value_offset: Optional[int] = None  # Offset where value bytes actually reside in file
-    length: Optional[int] = None        # Byte length of value data
+    offset: Optional[int] = None
+    value_offset: Optional[int] = None
+    length: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {
@@ -95,7 +95,7 @@ class Field:
 class ResourceBudget:
     max_depth: int = 16
     max_units: int = 4096
-    max_decompressed_bytes: int = 16 * 1024 * 1024  # 16 MB
+    max_decompressed_bytes: int = 16 * 1024 * 1024
     max_time_seconds: float = 10.0
     max_memory_mb: int = 256
 

@@ -24,7 +24,6 @@ class GifContainerReader(ContainerReader):
             diagnostics.append(Diagnostic(level="error", message="GIF file too small", source="gif_reader"))
             return units, blocks, diagnostics
 
-        # Header (6 bytes: GIF87a or GIF89a)
         sig = reader.read_bytes(0, 6)
         units.append(
             StructuralUnit(
@@ -37,7 +36,6 @@ class GifContainerReader(ContainerReader):
             )
         )
 
-        # Logical Screen Descriptor (7 bytes)
         lsd = reader.read_bytes(6, 7)
         w = int.from_bytes(lsd[:2], "little")
         h = int.from_bytes(lsd[2:4], "little")
@@ -70,13 +68,12 @@ class GifContainerReader(ContainerReader):
             offset += gct_size
 
         frame_count = 0
-        # Parse blocks until Trailer (0x3B)
         while offset < reader.size and reader.can_read(1, offset):
             intro = reader.read_bytes(offset, 1)
             if not intro:
                 break
 
-            if intro == b"\x3B":  # Trailer
+            if intro == b"\x3B":
                 units.append(
                     StructuralUnit(
                         name="TRAILER",
@@ -103,7 +100,7 @@ class GifContainerReader(ContainerReader):
                     )
                 break
 
-            elif intro == b"\x21":  # Extension Block
+            elif intro == b"\x21":
                 if offset + 2 > reader.size:
                     break
                 label = reader.read_bytes(offset + 1, 1)
@@ -122,7 +119,6 @@ class GifContainerReader(ContainerReader):
                     ext_name = "PLAIN_TEXT"
                     desc = "Plain Text Extension"
 
-                # Skip sub-blocks
                 block_start = offset
                 offset += 2
                 while offset < reader.size:
@@ -147,21 +143,18 @@ class GifContainerReader(ContainerReader):
                     )
                 )
 
-            elif intro == b"\x2C":  # Image Descriptor
+            elif intro == b"\x2C":
                 frame_count += 1
                 img_start = offset
-                offset += 10  # 1 (0x2C) + 8 (coords) + 1 (packed)
+                offset += 10
                 if offset > reader.size:
                     break
-                # Local color table if present
                 packed = reader.read_bytes(img_start + 9, 1)[0]
                 if packed & 0x80:
                     lct_size = 3 * (2 ** ((packed & 0x07) + 1))
                     offset += lct_size
 
-                # LZW Minimum Code Size
                 offset += 1
-                # Skip raster data sub-blocks
                 while offset < reader.size:
                     sub_len_b = reader.read_bytes(offset, 1)
                     if not sub_len_b:
@@ -184,7 +177,6 @@ class GifContainerReader(ContainerReader):
                     )
                 )
             else:
-                # Unknown byte, stop safely
                 offset += 1
 
         return units, blocks, diagnostics

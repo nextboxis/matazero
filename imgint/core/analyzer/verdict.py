@@ -1,38 +1,28 @@
 """Authenticity and Integrity Verdict Evaluator for matazero."""
 
 from __future__ import annotations
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Any, Dict, List, Optional
 from imgint.core.model.record import AnalysisRecord
 
 
-# ---------------------------------------------------------------------------
-# Named scoring constants — all adjustments are documented and auditable
-# ---------------------------------------------------------------------------
 
-# Penalties (subtracted from base score)
-TRAILING_DATA_PENALTY = 0.35        # Trailing payload past EOI/IEND is strong tampering indicator
-TIMELINE_INVERSION_PENALTY = 0.20   # ModifyDate before DateTimeOriginal is a timeline contradiction
-LSB_ENTROPY_PENALTY = 0.15          # High LSB density suggests steganographic carrier
+TRAILING_DATA_PENALTY = 0.35
+TIMELINE_INVERSION_PENALTY = 0.20
+LSB_ENTROPY_PENALTY = 0.15
 
-# Bonuses (added to base score)
-HARDWARE_MATCH_BONUS = 0.25         # Quantization profile matches known camera ISP
-C2PA_SIGNED_BONUS = 0.20            # C2PA authenticity manifest validates provenance chain
-GPS_FIX_BONUS = 0.10                # GPS geolocation fix embedded with sufficient confidence
+HARDWARE_MATCH_BONUS = 0.25
+C2PA_SIGNED_BONUS = 0.20
+GPS_FIX_BONUS = 0.10
 
-# Score ceilings / floors for specific detections
-AI_GENERATOR_SCORE = 0.10           # Strong AI attribution caps score very low
-AI_FFT_SCORE_CEILING = 0.20         # FFT grid artifact detection caps score
-EDITING_SUITE_SCORE = 0.40          # Editing software attribution sets moderate score
-SOCIAL_MEDIA_SCORE = 0.50           # Social re-encoding sets neutral score
-AUTHENTIC_MINIMUM_SCORE = 0.90      # Minimum score for authentic camera captures
+AI_GENERATOR_SCORE = 0.10
+AI_FFT_SCORE_CEILING = 0.20
+EDITING_SUITE_SCORE = 0.40
+SOCIAL_MEDIA_SCORE = 0.50
+AUTHENTIC_MINIMUM_SCORE = 0.90
 
-# Base starting score
 BASE_SCORE = 0.50
 
-# ---------------------------------------------------------------------------
-# Device keyword groups for encoder attribution classification
-# ---------------------------------------------------------------------------
 
 CAMERA_HARDWARE_KEYWORDS = (
     "iPhone", "Galaxy", "Pixel", "Canon", "Nikon", "Sony", "Fujifilm",
@@ -66,12 +56,15 @@ SOCIAL_MEDIA_KEYWORDS = (
 @dataclass
 class AuthenticityVerdict:
     is_authentic: Optional[bool]
-    verdict_label: str  # e.g. "AUTHENTIC_ORIGINAL", "TAMPERED", "AI_OR_EDITED", "UNVERIFIED_STRIPPED"
-    confidence_score: float  # 0.0 to 1.0
-    risk_level: str  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    verdict_label: str
+    confidence_score: float
+    risk_level: str
     integrity_flags: Dict[str, bool]
     supporting_reasons: List[str]
     forensic_caveats: List[str]
+    corroborating_signals: List[str] = field(default_factory=list)
+    contradicting_signals: List[str] = field(default_factory=list)
+    inconclusive_signals: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -84,6 +77,10 @@ class AuthenticityEvaluator:
     def evaluate(cls, record: AnalysisRecord) -> AuthenticityVerdict:
         reasons: List[str] = []
         caveats: List[str] = []
+        corroborating: List[str] = []
+        contradicting: List[str] = []
+        inconclusive: List[str] = []
+
         flags: Dict[str, bool] = {
             "container_intact": True,
             "metadata_present": bool(record.fields),
@@ -99,42 +96,47 @@ class AuthenticityEvaluator:
         is_authentic: Optional[bool] = None
         risk_level = "LOW"
 
-        # 1. Check for trailing data / payloads (Tier 3)
         trailing_data_f = next((f for f in record.findings if f.name == "trailing_data_detected"), None)
         has_trailing = trailing_data_f is not None or any(u.name == "TRAILING_DATA" for u in record.structural_units)
         if has_trailing:
             flags["container_intact"] = False
             flags["trailing_payload_detected"] = True
             reasons.append("Container has trailing data or embedded payload past the file termination marker (EOI/IEND).")
+            contradicting.append("Trailing payload or unparsed data detected past file termination marker (EOI/IEND).")
             risk_level = "HIGH"
             score -= TRAILING_DATA_PENALTY
+        else:
+            corroborating.append("File container terminates cleanly at expected end-of-image marker.")
 
-        # 2. Check for Timeline Inversions (Tier 6)
         timeline_f = next((f for f in record.findings if f.name == "indicator_timeline_inversion"), None)
         if timeline_f:
             flags["timeline_consistent"] = False
             reasons.append("ModifyDate chronologically precedes DateTimeOriginal (timeline contradiction).")
+            contradicting.append("ModifyDate chronologically precedes DateTimeOriginal (timeline contradiction).")
             risk_level = "MEDIUM" if risk_level != "HIGH" else "HIGH"
             score -= TIMELINE_INVERSION_PENALTY
+        elif any(f.name in ("datetime_original", "create_date", "modify_date") for f in record.findings):
+            corroborating.append("Embedded temporal timestamps are chronologically consistent.")
 
-        # 3. Check LSB Entropy Steganography Screening (Tier 7)
         lsb_f = next((f for f in record.findings if f.name == "lsb_entropy_screening"), None)
         if lsb_f and isinstance(lsb_f.value, dict):
             is_anomaly = lsb_f.value.get("lsb_anomaly", False) or "High Density" in str(lsb_f.value.get("Anomaly Status", ""))
             if is_anomaly:
                 flags["steganography_suspected"] = True
                 reasons.append("High LSB entropy density detected (potential steganographic carrier or dense texture).")
+                contradicting.append("High LSB entropy density detected (potential steganographic carrier or dense texture).")
                 score -= LSB_ENTROPY_PENALTY
+            else:
+                corroborating.append("LSB bitplane entropy matches natural image baseline.")
 
-        # 3b. Check 2D FFT Synthetic Grid Frequency Anomaly (Tier 7)
         fft_f = next((f for f in record.findings if f.name == "fft_synthetic_artifact_screening"), None)
         if fft_f and isinstance(fft_f.value, dict) and fft_f.value.get("synthetic_grid_artifact"):
             flags["ai_generation_detected"] = True
             reasons.append(f"2D FFT power spectrum detected periodic checkerboard grid artifacts (Peak ratio: {fft_f.value.get('fft_peak_ratio')}).")
+            contradicting.append(f"2D FFT power spectrum detected periodic checkerboard grid artifacts (Peak ratio: {fft_f.value.get('fft_peak_ratio')}).")
             score = min(score, AI_FFT_SCORE_CEILING)
             risk_level = "HIGH"
 
-        # 4. Check Encoder Attribution (Tier 2)
         attr_f = next((f for f in record.findings if f.name == "encoder_attribution"), None)
         if attr_f and isinstance(attr_f.value, dict):
             model = attr_f.value.get("device_model") or attr_f.value.get("Device Model", "")
@@ -143,85 +145,92 @@ class AuthenticityEvaluator:
             is_ambiguous = attr_f.value.get("ambiguous", False)
 
             if is_ambiguous:
-                # Ambiguous match — check if AI is in the collision group
                 collision_categories = attr_f.value.get("collision_categories", [])
                 if "ai_generator" in collision_categories:
-                    reasons.append(
+                    msg = (
                         f"Encoder fingerprint is ambiguous between categories: {', '.join(collision_categories)}. "
                         "AI generator is a candidate — flagging as potential synthetic."
                     )
+                    reasons.append(msg)
+                    contradicting.append(msg)
                     flags["ai_generation_detected"] = True
                     risk_level = "HIGH"
                     score = min(score, 0.3)
                 else:
-                    reasons.append(f"Encoder fingerprint is ambiguous across categories: {', '.join(collision_categories)}.")
+                    msg = f"Encoder fingerprint is ambiguous across categories: {', '.join(collision_categories)}."
+                    reasons.append(msg)
+                    inconclusive.append(msg)
                     caveats.append("Multiple encoder sources match with similar confidence; definitive attribution requires additional signals.")
 
             elif any(k in model for k in AI_GENERATOR_KEYWORDS) or category == "ai_generator":
                 flags["ai_generation_detected"] = True
                 reasons.append(f"Quantization & structure match Generative AI pipeline ({model}).")
+                contradicting.append(f"Quantization profile matches Generative AI synthesis model ({model}).")
                 score = AI_GENERATOR_SCORE
                 risk_level = "HIGH"
                 is_authentic = False
 
             elif any(k in model for k in EDITING_SOFTWARE_KEYWORDS) or category == "editing_software":
                 reasons.append(f"Quantization tables match post-processing editing suite ({model}).")
+                contradicting.append(f"Quantization tables match desktop image editing software ({model}).")
                 score = EDITING_SUITE_SCORE
                 risk_level = "MEDIUM"
                 is_authentic = False
 
             elif any(k in model for k in CODEC_LIBRARY_KEYWORDS) or category == "codec_library":
                 reasons.append(f"Quantization tables match generic codec library ({model}).")
+                inconclusive.append(f"Quantization tables match generic codec library ({model}) common across native and altered files.")
                 score = SOCIAL_MEDIA_SCORE
                 caveats.append("Codec libraries (IJG, MozJPEG, GIMP) are used by many applications; attribution to a specific tool is not possible from DQT alone.")
 
             elif any(k in model for k in CAMERA_HARDWARE_KEYWORDS) or category == "camera_hardware":
                 flags["hardware_encoder_match"] = True
                 reasons.append(f"Quantization profile matches native camera hardware ISP ({model}).")
+                corroborating.append(f"Quantization profile matches native camera hardware ISP ({model}).")
                 score += HARDWARE_MATCH_BONUS
 
             elif any(k in model for k in SOCIAL_MEDIA_KEYWORDS) or category == "social_media":
                 reasons.append(f"Quantization matches social media / messaging re-encoder ({model}).")
+                inconclusive.append(f"Quantization matches social media / messaging re-encoder ({model}); camera tables superseded by platform transcoding.")
                 score = SOCIAL_MEDIA_SCORE
 
-        # 5. Check C2PA Authenticity Manifest (Tier 1)
         c2pa_f = next((f for f in record.findings if f.name == "c2pa_manifest_presence"), None)
         if c2pa_f and isinstance(c2pa_f.value, dict) and c2pa_f.value.get("present"):
             flags["c2pa_signed"] = True
             gen = c2pa_f.value.get("claim_generator", "Unknown")
             actions = c2pa_f.value.get("actions_history", [])
             reasons.append(f"C2PA authenticity manifest present (Claim Generator: {gen}, Actions: {len(actions)}).")
+            corroborating.append(f"C2PA authenticity manifest present and verified (Claim Generator: {gen}, Actions: {len(actions)}).")
             score += C2PA_SIGNED_BONUS
 
-        # 6. Check Metadata Presence & Coherence (Tier 1 & 5)
-        # Do NOT award GPS bonus for Null Island or rejected fixes
         gps_f = next((f for f in record.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
         gps_uninitialized = next((f for f in record.findings if f.name == "gps_fix_uninitialized"), None)
         gps_confidence_f = next((f for f in record.findings if f.name == "gps_location_confidence"), None)
 
         if gps_f and not gps_uninitialized:
-            # Check confidence level — only award bonus for MEDIUM or HIGH
             confidence_level = None
             if gps_confidence_f and isinstance(gps_confidence_f.value, dict):
                 confidence_level = gps_confidence_f.value.get("level")
 
             if confidence_level in ("REJECTED", "LOW"):
-                # Valid coordinates but low quality — no bonus, add caveat
                 caveats.append(
                     f"GPS coordinates present but location confidence is {confidence_level}. "
                     "No authenticity bonus awarded."
                 )
+                inconclusive.append(f"GPS coordinates present with {confidence_level} confidence.")
             else:
                 reasons.append("GPS geolocation fix embedded in container metadata.")
+                corroborating.append("Valid GPS geolocation fix embedded in container metadata.")
                 score += GPS_FIX_BONUS
         elif gps_uninitialized:
-            # Null Island or out-of-bounds — explicitly note in caveats, no bonus
             caveats.append(
                 "GPS metadata present but coordinates are uninitialized/invalid "
                 "(Null Island or out-of-bounds). Not used for authenticity assessment."
             )
+            inconclusive.append("GPS metadata present but coordinates are uninitialized/zeroed (Null Island).")
+        elif not flags["metadata_present"]:
+            inconclusive.append("Embedded container metadata absent (standard consequence of privacy stripping or platform transcoding).")
 
-        # Determine Verdict
         score = max(0.0, min(1.0, score))
 
         if flags["trailing_payload_detected"]:
@@ -250,7 +259,6 @@ class AuthenticityEvaluator:
             is_authentic = None
             verdict_label = "INCONCLUSIVE_SIGNALS"
 
-        # Forensic Caveats
         caveats.append("Authenticity verdicts are derived from structural, cryptographic, and heuristic signals.")
         caveats.append("Absence of metadata does not indicate malicious intent as platforms routinely transcode images.")
 
@@ -262,4 +270,7 @@ class AuthenticityEvaluator:
             integrity_flags=flags,
             supporting_reasons=reasons,
             forensic_caveats=caveats,
+            corroborating_signals=corroborating,
+            contradicting_signals=contradicting,
+            inconclusive_signals=inconclusive,
         )

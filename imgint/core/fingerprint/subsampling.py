@@ -8,12 +8,12 @@ from typing import Dict, List, Optional, Tuple
 
 @dataclass
 class ChromaSubsamplingInfo:
-    notation: str       # "4:4:4", "4:2:2", "4:2:0", "4:1:1", "Grayscale", etc.
+    notation: str
     components_count: int
     precision_bits: int
     image_width: int
     image_height: int
-    sampling_factors: Dict[int, Tuple[int, int]]  # Component ID -> (H, V)
+    sampling_factors: Dict[int, Tuple[int, int]]
 
 
 class SubsamplingExtractor:

@@ -62,7 +62,6 @@ class SkillRegistry:
             for skill_dir in base_path.iterdir():
                 if not skill_dir.is_dir():
                     continue
-                # Look for manifest
                 manifest_file = None
                 for mf_name in ("skill.yaml", "skill.yml", "skill.json"):
                     cand = skill_dir / mf_name

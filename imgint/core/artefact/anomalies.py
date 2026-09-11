@@ -16,7 +16,6 @@ class ContainerAnomalyDetector:
         names = [u.name for u in units]
         counts = Counter(names)
 
-        # Check for multiple SOF markers in JPEG
         sof_count = sum(c for name, c in counts.items() if name.startswith("SOF"))
         if format_name == "JPEG" and sof_count > 1:
             findings.append(
@@ -31,7 +30,6 @@ class ContainerAnomalyDetector:
                 )
             )
 
-        # Check for multiple IHDR chunks in PNG
         if format_name == "PNG" and counts.get("IHDR", 0) > 1:
             findings.append(
                 Finding(

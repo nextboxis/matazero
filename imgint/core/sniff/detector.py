@@ -10,7 +10,7 @@ from imgint.core.source.reader import BoundedReader
 
 @dataclass
 class DetectedFormat:
-    format_name: str     # "JPEG", "PNG", "TIFF", "WEBP", "HEIC", "AVIF", "GIF", "BMP", "PSD", "SVG", "UNKNOWN"
+    format_name: str
     mime_type: str
     is_supported: bool
     magic_bytes: bytes
@@ -119,7 +119,6 @@ class FormatDetector:
                 expected_extensions=[".psd"],
             )
 
-        # Check Office OpenXML / ZIP Packages (PPTX, DOCX, XLSX, ZIP)
         if len(head) >= 4 and head[:4] == b"PK\x03\x04":
             preview_bytes = reader.read_bytes(0, min(reader.size, 65536))
             if b"ppt/" in preview_bytes or b"presentation" in preview_bytes:
@@ -159,7 +158,6 @@ class FormatDetector:
                     expected_extensions=[".zip", ".odp", ".odt", ".ods", ".apk", ".jar"],
                 )
 
-        # Check SVG (XML text)
         try:
             head_str = head.decode("utf-8", errors="ignore").strip().lower()
             if head_str.startswith("<svg") or (head_str.startswith("<?xml") and "<svg" in head_str):

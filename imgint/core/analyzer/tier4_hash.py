@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import hashlib
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from imgint.core.analyzer.base import Analyzer, AnalysisContext
 from imgint.core.model.finding import Finding, Confidence, Provenance
 from imgint.core.model.record import Diagnostic
@@ -22,7 +22,7 @@ class HashingAnalyzer(Analyzer):
 
     @property
     def requires_decode(self) -> bool:
-        return False  # Main dispatcher runs in-process and delegates perceptual hashes to sandbox
+        return False
 
     def analyze(self, ctx: AnalysisContext) -> Tuple[List[Finding], List[Diagnostic]]:
         findings: List[Finding] = []
@@ -30,7 +30,6 @@ class HashingAnalyzer(Analyzer):
 
         all_bytes = ctx.reader.get_all_bytes()
 
-        # FR-5.1: SHA-256 of whole file
         file_sha256 = hashlib.sha256(all_bytes).hexdigest()
         findings.append(
             Finding(
@@ -44,7 +43,6 @@ class HashingAnalyzer(Analyzer):
             )
         )
 
-        # FR-5.2: SHA-256 of image data stream alone (excluding metadata)
         data_stream_hash = self._compute_pure_datastream_hash(ctx, all_bytes)
         if data_stream_hash:
             findings.append(
@@ -59,7 +57,6 @@ class HashingAnalyzer(Analyzer):
                 )
             )
 
-        # FR-5.3 & FR-5.4: Perceptual hashes via sandboxed decode
         sandbox_res = SandboxRunner.run_decode_tasks(ctx.file_path, tasks=["phashes"])
         if sandbox_res.get("success") and "tasks" in sandbox_res:
             phashes = sandbox_res["tasks"].get("phashes", {})
@@ -95,7 +92,6 @@ class HashingAnalyzer(Analyzer):
 
     def _compute_pure_datastream_hash(self, ctx: AnalysisContext, all_bytes: bytes) -> Optional[str]:
         if ctx.format_name == "JPEG":
-            # Extract bytes from SOS to EOI
             sos_unit = next((u for u in ctx.structural_units if u.name == "SOS"), None)
             eoi_unit = next((u for u in ctx.structural_units if u.name == "EOI"), None)
             if sos_unit:
@@ -106,7 +102,6 @@ class HashingAnalyzer(Analyzer):
                     return hashlib.sha256(entropy_slice).hexdigest()
 
         elif ctx.format_name == "PNG":
-            # Concatenate all IDAT chunks payload bytes
             idat_payloads = [u.payload for u in ctx.structural_units if u.name == "IDAT" and u.payload]
             if idat_payloads:
                 combined = b"".join(idat_payloads)

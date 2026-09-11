@@ -67,7 +67,6 @@ class OfficePropertiesParser(BlockParser):
                     length=block.length,
                 )
             )
-            # Recursively inspect embedded image metadata (EXIF, GPS, camera model)
             if block.raw_bytes:
                 try:
                     from imgint.core.source.reader import BoundedReader

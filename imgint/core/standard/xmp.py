@@ -27,7 +27,6 @@ class XmpParser(BlockParser):
         except Exception:
             xml_text = str(data)
 
-        # Locate rdf:RDF or x:xmpmeta tag
         start_idx = xml_text.find("<")
         if start_idx == -1:
             return fields, findings, diagnostics
@@ -38,14 +37,11 @@ class XmpParser(BlockParser):
             clean_xml = clean_xml[: end_idx + 1]
 
         try:
-            # Defend against XXE and entity expansion by using standard ElementTree without custom entity resolvers
             parser = ET.XMLParser()
             root = ET.fromstring(clean_xml, parser=parser)
 
-            # Walk all elements
             for elem in root.iter():
                 tag = elem.tag
-                # Strip namespace URI if present
                 if "}" in tag:
                     tag_name = tag.split("}", 1)[1]
                 else:
@@ -70,7 +66,6 @@ class XmpParser(BlockParser):
                         )
                     )
 
-                # Process attributes on Description elements (e.g. exif:DateTimeOriginal)
                 for attr_key, attr_val in elem.attrib.items():
                     attr_name = attr_key.split("}", 1)[1] if "}" in attr_key else attr_key
                     if attr_val and not attr_name.startswith("xmlns"):

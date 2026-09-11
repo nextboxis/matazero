@@ -28,7 +28,6 @@ class CopyMoveDetector:
         else:
             img = img_or_bytes.convert("L")
 
-        # Resize for performance if large
         max_dim = 512
         w, h = img.size
         scale = 1.0
@@ -47,19 +46,16 @@ class CopyMoveDetector:
                 "cloned_regions": [],
             }
 
-        # Extract blocks and their feature representations (mean, std, 4-quadrant means)
         blocks = []
         positions = []
 
         for y in range(0, height - block_size + 1, step_size):
             for x in range(0, width - block_size + 1, step_size):
                 patch = arr[y : y + block_size, x : x + block_size]
-                # Skip flat/low-entropy background (e.g. solid white/black/sky)
                 std_val = float(np.std(patch))
                 if std_val < 8.0:
                     continue
 
-                # 6-dimensional feature vector: mean, std, 4 quadrant means
                 half = block_size // 2
                 q1 = np.mean(patch[:half, :half])
                 q2 = np.mean(patch[:half, half:])
@@ -82,12 +78,10 @@ class CopyMoveDetector:
         blocks_arr = np.array(blocks)
         num_blocks = len(blocks_arr)
 
-        # Lexicographical sort on primary features for fast neighbor matching
         sort_idx = np.lexsort((blocks_arr[:, 1], blocks_arr[:, 0]))
         sorted_blocks = blocks_arr[sort_idx]
         sorted_pos = [positions[i] for i in sort_idx]
 
-        # Find matching pairs within a local search window
         shift_vector_counts: Dict[Tuple[int, int], int] = {}
         matched_regions: List[Dict[str, Any]] = []
 
@@ -99,17 +93,14 @@ class CopyMoveDetector:
                 f2 = sorted_blocks[j]
                 p2 = sorted_pos[j]
 
-                # Spatial Euclidean distance
                 dx = p2[0] - p1[0]
                 dy = p2[1] - p1[1]
                 dist = np.sqrt(dx * dx + dy * dy)
                 if dist < min_distance:
                     continue
 
-                # Feature similarity check (normalized difference)
                 diff = np.abs(f1 - f2) / (np.abs(f1) + np.abs(f2) + 1e-6)
                 if np.max(diff) < (1.0 - similarity_threshold):
-                    # Quantize shift vector to 16px bins
                     if dx < 0 or (dx == 0 and dy < 0):
                         dx, dy = -dx, -dy
                     shift_key = (round(dx / 16) * 16, round(dy / 16) * 16)
@@ -122,7 +113,6 @@ class CopyMoveDetector:
                             "block_size": int(round(block_size / scale)),
                         })
 
-        # A significant cluster of identical shift vectors indicates deliberate clone-stamping
         significant_clusters = [k for k, count in shift_vector_counts.items() if count >= 4]
         is_cloned = len(significant_clusters) > 0
 

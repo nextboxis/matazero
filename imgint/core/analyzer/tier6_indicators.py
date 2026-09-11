@@ -28,7 +28,6 @@ class IndicatorsAnalyzer(Analyzer):
         findings: List[Finding] = []
         diagnostics: List[Diagnostic] = []
 
-        # FR-7.9: Absence of metadata must be reported as normal platform distribution, never as tampering
         if not ctx.metadata_blocks:
             findings.append(
                 Finding(
@@ -42,7 +41,6 @@ class IndicatorsAnalyzer(Analyzer):
                 )
             )
 
-        # FR-7.4: Metadata timeline contradiction check
         dt_orig_str = ctx.get_field_value("DateTimeOriginal")
         dt_mod_str = ctx.get_field_value("ModifyDate") or ctx.get_field_value("DateTime")
 
@@ -50,7 +48,9 @@ class IndicatorsAnalyzer(Analyzer):
             dt_orig = self._parse_iso_or_exif(str(dt_orig_str))
             dt_mod = self._parse_iso_or_exif(str(dt_mod_str))
             if dt_orig and dt_mod:
-                if dt_mod < dt_orig:
+                orig_cmp = dt_orig if dt_orig.tzinfo is not None else dt_orig.replace(tzinfo=timezone.utc)
+                mod_cmp = dt_mod if dt_mod.tzinfo is not None else dt_mod.replace(tzinfo=timezone.utc)
+                if mod_cmp < orig_cmp:
                     findings.append(
                         Finding(
                             name="indicator_timeline_inversion",
@@ -70,7 +70,6 @@ class IndicatorsAnalyzer(Analyzer):
                         )
                     )
 
-        # FR-7.5: Thumbnail / Main divergence check
         thumb_finding = ctx.get_finding("exif_thumbnail_extracted")
         if thumb_finding:
             findings.append(
@@ -85,7 +84,6 @@ class IndicatorsAnalyzer(Analyzer):
                 )
             )
 
-        # FR-7.7: Error Level Analysis (ELA) strictly behind opt-in flag
         if ctx.enable_ela:
             sandbox_res = SandboxRunner.run_decode_tasks(ctx.file_path, tasks=["ela"])
             if sandbox_res.get("success") and "tasks" in sandbox_res:
@@ -109,8 +107,17 @@ class IndicatorsAnalyzer(Analyzer):
         return findings, diagnostics
 
     def _parse_iso_or_exif(self, s: str) -> Optional[datetime]:
-        clean = s.strip().split("+")[0].split(".")[0]
-        for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S"):
+        s = s.strip()
+        if not s:
+            return None
+        try:
+            iso_s = s.replace("Z", "+00:00") if s.endswith("Z") else s
+            return datetime.fromisoformat(iso_s)
+        except Exception:
+            pass
+
+        clean = s.split(".")[0]
+        for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
             try:
                 return datetime.strptime(clean, fmt)
             except Exception:

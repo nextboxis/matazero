@@ -61,13 +61,11 @@ class PayloadCarver:
         if not units:
             return None
 
-        # Check if there is a TRAILING_DATA unit
         trailing_unit = next((u for u in units if u.name == "TRAILING_DATA"), None)
         if trailing_unit:
             terminal_offset = trailing_unit.offset
             trailing_len = trailing_unit.length
         else:
-            # Find non-trailing terminal unit (e.g. EOI, IEND, TRAILER)
             non_trailing = [u for u in units if u.name != "TRAILING_DATA"]
             if not non_trailing:
                 return None

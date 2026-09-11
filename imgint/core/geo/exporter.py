@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class GeoExporter:
@@ -26,7 +29,6 @@ class GeoExporter:
             if lat is None or lon is None:
                 continue
 
-            # IDEA 1: Skip Null Island coordinates in exports
             if abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001:
                 continue
 
@@ -44,7 +46,6 @@ class GeoExporter:
                 "camera_make": pt.get("camera_make"),
                 "camera_model": pt.get("camera_model"),
             }
-            # Clean None values
             props = {k: v for k, v in props.items() if v is not None}
 
             feature = {
@@ -57,7 +58,6 @@ class GeoExporter:
             }
             features.append(feature)
 
-        # If more than 1 point, add a trajectory LineString feature
         if len(coordinates_list) > 1:
             features.append({
                 "type": "Feature",
@@ -73,17 +73,15 @@ class GeoExporter:
                 },
             })
 
-        # If geofence provided, append geofence polygon features
         if geofence_geojson:
             try:
                 from imgint.core.geo.locator import GeoLocator
                 gf_features = GeoLocator.load_geojson_features(geofence_geojson)
                 for gf in gf_features:
                     features.append(gf)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to load geofence features for GeoJSON export: %s", e)
 
-        # Calculate bounding box
         bbox = None
         if coordinates_list:
             min_lon = min(c[0] for c in coordinates_list)
@@ -118,7 +116,6 @@ class GeoExporter:
             lat = pt.get("latitude") or pt.get("y")
             lon = pt.get("longitude") or pt.get("x")
             if lat is not None and lon is not None:
-                # IDEA 1: Skip Null Island coordinates in exports
                 if abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001:
                     continue
                 item = dict(pt)
@@ -126,15 +123,14 @@ class GeoExporter:
                 item["lon"] = float(lon)
                 item["idx"] = idx + 1
 
-                # If geofence provided, check inside status
                 if geofence_geojson:
                     try:
                         from imgint.core.geo.locator import GeoLocator
                         gf_res = GeoLocator.is_point_in_geofence(float(lat), float(lon), geofence_geojson)
                         item["inside_geofence"] = gf_res.get("inside_geofence", False)
                         item["geofence_boundary"] = gf_res.get("matched_feature_name")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning("Failed geofence evaluation for point (%s, %s): %s", lat, lon, e)
 
                 valid_points.append(item)
 
@@ -145,8 +141,8 @@ class GeoExporter:
                 gf_feats = GeoLocator.load_geojson_features(geofence_geojson)
                 if gf_feats:
                     geofence_data_json = json.dumps({"type": "FeatureCollection", "features": gf_feats})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to serialize geofence features for Leaflet export: %s", e)
 
         if not valid_points:
             center_lat, center_lon = 20.0, 0.0
@@ -557,7 +553,6 @@ class GeoExporter:
             if lat is None or lon is None:
                 continue
 
-            # IDEA 1: Skip Null Island coordinates in exports
             if abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001:
                 continue
 
@@ -580,6 +575,5 @@ class GeoExporter:
         ])
         return "\n".join(lines)
 
-    # Alias for export compatibility
     to_html = to_leaflet_html
 

@@ -1,6 +1,7 @@
 """Chronological timeline reconstruction and clock drift estimator."""
 
 from __future__ import annotations
+import logging
 import os
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone, timedelta
@@ -12,6 +13,8 @@ from imgint.core.governance.scope import AuthorizationScope
 from imgint.core.model.record import AnalysisRecord
 from imgint.core.geo.locator import GeoLocator
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class TimelineEvent:
@@ -19,7 +22,7 @@ class TimelineEvent:
     file_path: str
     sha256: str
     primary_timestamp: datetime
-    timestamp_source: str  # "EXIF_DateTimeOriginal", "EXIF_ModifyDate", "GPS_Satellite_UTC", "Filesystem_Mtime"
+    timestamp_source: str
     raw_timestamp_str: str
     gps_satellite_time: Optional[datetime] = None
     camera_clock_drift_seconds: Optional[float] = None
@@ -75,11 +78,11 @@ class TimelineReconstructor:
                 rec = pipeline.analyze_file(p)
                 event = cls._extract_event_from_record(p, rec)
                 events.append(event)
-            except Exception:
-                # Fallback to filesystem mtime
+            except Exception as e:
+                logger.warning("Pipeline analysis failed for %s during timeline reconstruction: %s", p, e)
                 try:
-                    stat = p.stat()
-                    dt = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+                    p_stat = p.stat()
+                    dt = datetime.fromtimestamp(p_stat.st_mtime, tz=timezone.utc)
                     events.append(
                         TimelineEvent(
                             file_name=p.name,
@@ -90,13 +93,11 @@ class TimelineReconstructor:
                             raw_timestamp_str=dt.isoformat(),
                         )
                     )
-                except Exception:
-                    pass
+                except Exception as stat_err:
+                    logger.warning("Failed to retrieve filesystem timestamp for %s: %s", p, stat_err)
 
-        # Sort events chronologically by primary timestamp
         events.sort(key=lambda e: e.primary_timestamp)
 
-        # Calculate time deltas and chronological anomalies
         anomalies: List[str] = []
         for i in range(len(events)):
             if i > 0:
@@ -105,22 +106,17 @@ class TimelineReconstructor:
                 delta_sec = (curr_event.primary_timestamp - prev_event.primary_timestamp).total_seconds()
                 curr_event.time_delta_from_previous_sec = delta_sec
 
-                # Detect filename sequence inversion vs timestamp
-                # e.g., IMG_0005 taken BEFORE IMG_0004
                 if prev_event.file_name > curr_event.file_name and delta_sec > 0:
-                    pass  # Natural
+                    pass
                 elif prev_event.file_name < curr_event.file_name and delta_sec < 0:
                     msg = f"Sequence Inversion: '{curr_event.file_name}' appears after '{prev_event.file_name}' alphabetically but has an earlier timestamp."
                     curr_event.anomalies.append(msg)
                     anomalies.append(msg)
 
-                # IDEA 5: Kinematic Speed Anomaly Detection
-                # Check implied travel speed between consecutive GPS-tagged events
                 if prev_event.gps_coordinates and curr_event.gps_coordinates:
                     prev_lat, prev_lon = prev_event.gps_coordinates
                     curr_lat, curr_lon = curr_event.gps_coordinates
 
-                    # Filter out Null Island coordinates from trajectory analysis
                     prev_valid = not GeoLocator.is_null_island(prev_lat, prev_lon)
                     curr_valid = not GeoLocator.is_null_island(curr_lat, curr_lon)
 
@@ -139,10 +135,9 @@ class TimelineReconstructor:
                             curr_event.anomalies.append(msg)
                             anomalies.append(msg)
 
-            # Check clock drift anomaly
             if events[i].camera_clock_drift_seconds is not None:
                 drift = events[i].camera_clock_drift_seconds
-                if abs(drift) > 300:  # > 5 minutes drift
+                if abs(drift) > 300:
                     msg = f"Severe Camera Clock Drift in '{events[i].file_name}': Internal clock differs from GPS satellite time by {drift:+.1f}s ({drift/60.0:+.1f} mins)."
                     events[i].anomalies.append(msg)
                     anomalies.append(msg)
@@ -165,10 +160,8 @@ class TimelineReconstructor:
 
     @classmethod
     def _extract_event_from_record(cls, file_path: Path, rec: AnalysisRecord) -> TimelineEvent:
-        # Extract fields
         f_map = {f.name: f.value for f in rec.fields}
         
-        # 1. Primary timestamp resolution
         dt_orig_raw = f_map.get("DateTimeOriginal")
         dt_mod_raw = f_map.get("ModifyDate") or f_map.get("DateTime")
         
@@ -194,7 +187,6 @@ class TimelineReconstructor:
             ts_source = "Filesystem_Mtime"
             raw_str = dt_primary.isoformat()
 
-        # 2. GPS Satellite timestamp & Clock Drift
         gps_satellite_dt = None
         drift_seconds = None
         gps_date = f_map.get("GPSDateStamp")
@@ -203,11 +195,9 @@ class TimelineReconstructor:
         if gps_date and gps_time:
             gps_satellite_dt = cls._parse_gps_datetime(str(gps_date), gps_time)
             if gps_satellite_dt and dt_primary:
-                # Normalize dt_primary to UTC for drift comparison
                 dt_utc = dt_primary if dt_primary.tzinfo else dt_primary.replace(tzinfo=timezone.utc)
                 drift_seconds = round((dt_utc - gps_satellite_dt).total_seconds(), 2)
 
-        # 3. GPS Coordinates (Sanitized against bounds and Null Island)
         gps_finding = next((f for f in rec.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
         coords = None
         if gps_finding and isinstance(gps_finding.value, dict):
@@ -219,8 +209,8 @@ class TimelineReconstructor:
                     if -90.0 <= f_lat <= 90.0 and -180.0 <= f_lon <= 180.0:
                         if not (abs(f_lat) < 0.0001 and abs(f_lon) < 0.0001):
                             coords = (f_lat, f_lon)
-                except Exception:
-                    pass
+                except (ValueError, TypeError) as parse_err:
+                    logger.debug("Failed parsing GPS coordinates (%s, %s): %s", lat, lon, parse_err)
 
         make = str(f_map.get("Make")) if f_map.get("Make") else None
         model = str(f_map.get("Model")) if f_map.get("Model") else None
@@ -250,21 +240,20 @@ class TimelineReconstructor:
                 hrs = int(parts[0])
                 mins = int(parts[1])
                 tz = timezone(sign * timedelta(hours=hrs, minutes=mins))
-            except Exception:
-                pass
+            except (ValueError, IndexError) as tz_err:
+                logger.debug("Failed parsing timezone offset %r: %s", offset_str, tz_err)
 
         for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S"):
             try:
                 dt = datetime.strptime(clean, fmt)
                 return dt.replace(tzinfo=tz)
-            except Exception:
-                pass
+            except ValueError:
+                continue
         return None
 
     @classmethod
     def _parse_gps_datetime(cls, date_str: str, time_val: Any) -> Optional[datetime]:
         try:
-            # date_str is typically "YYYY:MM:DD" or "YYYY-MM-DD"
             date_clean = date_str.strip().replace("-", ":")
             parts = date_clean.split(":")
             year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
@@ -280,5 +269,6 @@ class TimelineReconstructor:
                 return None
 
             return datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
-        except Exception:
+        except (ValueError, IndexError, TypeError) as gps_err:
+            logger.debug("Failed parsing GPS datetime (date=%r, time=%r): %s", date_str, time_val, gps_err)
             return None

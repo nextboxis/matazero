@@ -20,7 +20,6 @@ class TimelineExporter:
 
     @classmethod
     def render_terminal(cls, report: TimelineReport, console: Console) -> None:
-        # Header Panel
         panel_content = Text()
         panel_content.append(f"Total Timeline Events: ", style="dim")
         panel_content.append(f"{report.total_events}\n", style="bold cyan")
@@ -38,7 +37,6 @@ class TimelineExporter:
 
         console.print(Panel(panel_content, title="[bold]matazero Forensic Timeline & Chronolocation Reconstruction[/bold]", border_style="cyan"))
 
-        # Events Table
         table = Table(title=f"Chronological Evidence Sequence ({report.total_events} Events)", show_header=True)
         table.add_column("#", justify="right", style="dim")
         table.add_column("Timestamp (UTC/Offset)", style="bold green")

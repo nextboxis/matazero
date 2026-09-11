@@ -65,13 +65,11 @@ class ForensicComparator:
         rec_a = pipeline.analyze_file(p_a)
         rec_b = pipeline.analyze_file(p_b)
 
-        # 1. Container & Size
         size_a = p_a.stat().st_size
         size_b = p_b.stat().st_size
         size_delta = size_b - size_a
         sha_match = (rec_a.sha256 == rec_b.sha256)
 
-        # 2. Cryptographic & Perceptual Hashes
         data_hash_a = next((f.value.get("pure_data_sha256") for f in rec_a.findings if f.name == "cryptographic_hashes" and isinstance(f.value, dict)), None)
         data_hash_b = next((f.value.get("pure_data_sha256") for f in rec_b.findings if f.name == "cryptographic_hashes" and isinstance(f.value, dict)), None)
         data_match = bool(data_hash_a and data_hash_b and data_hash_a == data_hash_b)
@@ -93,13 +91,10 @@ class ForensicComparator:
         dhash_dist = _hamming(phash_data_a.get("dhash"), phash_data_b.get("dhash"))
         phash_dist = _hamming(phash_data_a.get("phash"), phash_data_b.get("phash"))
 
-        # 3. Metadata Diff
         meta_diff = cls._diff_metadata(rec_a, rec_b)
 
-        # 4. DQT Comparison
         dqt_dist, dqt_sim = cls._diff_dqt(rec_a, rec_b)
 
-        # 5. Sandboxed Pixel Diff
         sandbox_res = SandboxRunner.run_decode_tasks(
             str(p_a), tasks=["pixel_diff"], compare_file_path=str(p_b)
         )
@@ -107,7 +102,6 @@ class ForensicComparator:
         if sandbox_res.get("success") and "tasks" in sandbox_res:
             pixel_diff = sandbox_res["tasks"].get("pixel_diff")
 
-        # 6. Synthesize Relationship Verdict
         verdict, reasons = cls._evaluate_verdict(
             sha_match=sha_match,
             data_match=data_match,
@@ -164,7 +158,6 @@ class ForensicComparator:
 
     @classmethod
     def _diff_dqt(cls, rec_a: AnalysisRecord, rec_b: AnalysisRecord) -> Tuple[Optional[float], Optional[float]]:
-        # Find DQT tables from structural units
         dqt_a = None
         dqt_b = None
         for u in rec_a.structural_units:

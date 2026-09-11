@@ -14,7 +14,6 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-# IANA timezone offset resolution (Python 3.9+ zoneinfo with pytz fallback)
 try:
     from zoneinfo import ZoneInfo, available_timezones as _available_tz
     _HAS_ZONEINFO = True
@@ -31,7 +30,6 @@ try:
 except ImportError:
     _HAS_PYTZ = False
 
-# Optional high-performance packages with resilient internal fallbacks
 try:
     from timezonefinder import TimezoneFinder
     _TZ_FINDER: Optional[TimezoneFinder] = TimezoneFinder()
@@ -62,12 +60,10 @@ COMPASS_DIRECTIONS = [
 ]
 
 
-# --- Coordinate Validation Status Constants ---
 COORD_VALID = "VALID"
 COORD_NULL_ISLAND = "NULL_ISLAND"
 COORD_OUT_OF_BOUNDS = "OUT_OF_BOUNDS"
 
-# --- Location Confidence Levels ---
 LOC_CONFIDENCE_HIGH = "HIGH"
 LOC_CONFIDENCE_MEDIUM = "MEDIUM"
 LOC_CONFIDENCE_LOW = "LOW"
@@ -185,9 +181,6 @@ class GeoLocator:
             cls._spatial_tree = SpatialKDTree([])
         return cls._cached_places
 
-    # -------------------------------------------------------------------------
-    # Idea 1: Coordinate Sanitization & Null Island Detection
-    # -------------------------------------------------------------------------
 
     @staticmethod
     def validate_coordinates(lat: float, lon: float) -> Dict[str, Any]:
@@ -247,7 +240,6 @@ class GeoLocator:
     @classmethod
     def get_timezone(cls, lat: float, lon: float) -> Optional[str]:
         """Resolves IANA timezone name (e.g. 'America/New_York') from coordinates."""
-        # 1. Try TimezoneFinder polygon lookup
         if _TZ_FINDER is not None:
             try:
                 tz_name = _TZ_FINDER.timezone_at(lat=lat, lng=lon)
@@ -256,12 +248,10 @@ class GeoLocator:
             except Exception:
                 pass
 
-        # 2. Fall back to closest offline database place
         closest = cls.reverse_geocode_offline(lat, lon)
         if closest and closest.get("timezone"):
             return closest["timezone"]
 
-        # 3. Fall back to approximate solar timezone offset string
         approx_offset = round(lon / 15.0)
         sign = "+" if approx_offset >= 0 else "-"
         return f"Etc/GMT{sign}{abs(approx_offset)}"
@@ -282,7 +272,6 @@ class GeoLocator:
             Dict with geocoding result, or None if database is empty.
             Includes 'is_approximate' flag when distance exceeds threshold.
         """
-        # Reject Null Island and out-of-bounds coordinates
         validation = cls.validate_coordinates(lat, lon)
         if not validation["is_valid"]:
             return None
@@ -290,7 +279,6 @@ class GeoLocator:
         sqlite_candidate: Optional[Dict[str, Any]] = None
         sqlite_dist = float("inf")
 
-        # 1. Check Natural Earth Vector SQLite database if available
         ne_db = NaturalEarthDB.get_instance()
         if ne_db.is_available:
             try:
@@ -314,7 +302,6 @@ class GeoLocator:
             except Exception:
                 pass
 
-        # 2. Check bundled dense offline gazetteer (10,600+ places indexed via SpatialKDTree)
         kdtree_candidate: Optional[Dict[str, Any]] = None
         kdtree_dist = float("inf")
 
@@ -346,7 +333,6 @@ class GeoLocator:
                             f"Remote / Offshore Area (approx. {round(kdtree_dist)}km from {best_place.get('name')})"
                         )
 
-        # Select the candidate with the smallest geodesic distance
         if kdtree_candidate and (not sqlite_candidate or kdtree_dist < sqlite_dist):
             return kdtree_candidate
         elif sqlite_candidate:
@@ -465,7 +451,6 @@ class GeoLocator:
         theta = math.atan2(y, x)
         bearing = (math.degrees(theta) + 360.0) % 360.0
 
-        # Compass direction (16-point wind rose)
         idx = int((bearing + 11.25) / 22.5) % 16
         cardinal = COMPASS_DIRECTIONS[idx]
 
@@ -479,7 +464,6 @@ class GeoLocator:
         cls, lat: float, lon: float, dt: datetime
     ) -> Dict[str, Any]:
         """Computes solar elevation, azimuth, dawn/dusk, and daylight state for shadow validation."""
-        # Ensure UTC timezone aware datetime
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         else:
@@ -493,7 +477,6 @@ class GeoLocator:
             "day_phase": "Night",
         }
 
-        # 1. Try Astral if installed
         if _HAS_ASTRAL:
             try:
                 loc = LocationInfo(name="Target", region="Unknown", timezone="UTC", latitude=lat, longitude=lon)
@@ -510,7 +493,6 @@ class GeoLocator:
                     shadow_factor = 1.0 / math.tan(rad) if math.tan(rad) != 0 else 0.0
                     result["shadow_length_factor"] = round(shadow_factor, 2)
 
-                # Solar events
                 result["sunrise_utc"] = s["sunrise"].strftime("%H:%M:%S")
                 result["sunset_utc"] = s["sunset"].strftime("%H:%M:%S")
                 result["noon_utc"] = s["noon"].strftime("%H:%M:%S")
@@ -534,7 +516,6 @@ class GeoLocator:
             except Exception:
                 pass
 
-        # 2. NOAA Standard Algorithm Fallback
         noaa = cls._compute_noaa_solar_position(lat, lon, dt)
         if noaa:
             result.update(noaa)
@@ -658,9 +639,6 @@ class GeoLocator:
                 pass
         return None
 
-    # -------------------------------------------------------------------------
-    # Idea 4: IANA Timezone Offset Validation (replaces lon / 15.0 heuristic)
-    # -------------------------------------------------------------------------
 
     @classmethod
     def get_valid_utc_offsets_for_zone(cls, iana_zone: str) -> List[float]:
@@ -672,11 +650,9 @@ class GeoLocator:
         """
         offsets: set = set()
 
-        # Strategy 1: Use zoneinfo (Python 3.9+)
         if _HAS_ZONEINFO:
             try:
                 tz = ZoneInfo(iana_zone)
-                # Sample the last 2 years at monthly intervals to catch DST transitions
                 base = datetime(2024, 1, 1, 12, 0, 0)
                 for month_offset in range(24):
                     dt = base.replace(month=((month_offset % 12) + 1), year=2024 + month_offset // 12)
@@ -687,17 +663,14 @@ class GeoLocator:
             except Exception:
                 pass
 
-        # Strategy 2: Use pytz
         if _HAS_PYTZ:
             try:
                 tz = pytz.timezone(iana_zone)
-                # pytz stores _utc_transition_times for historical offsets
                 if hasattr(tz, '_utc_transition_times') and tz._utc_transition_times:
                     for trans_info in tz._transition_info[-24:]:
                         off_hours = trans_info[0].total_seconds() / 3600.0
                         offsets.add(round(off_hours, 2))
                 else:
-                    # Fixed-offset zone
                     dt = datetime(2024, 6, 15, 12, 0, 0)
                     dt_aware = tz.localize(dt)
                     off_hours = dt_aware.utcoffset().total_seconds() / 3600.0
@@ -707,7 +680,6 @@ class GeoLocator:
             except Exception:
                 pass
 
-        # Strategy 3: Fallback — cannot validate, return empty (caller should skip check)
         return []
 
     @classmethod
@@ -719,18 +691,13 @@ class GeoLocator:
         """
         valid_offsets = cls.get_valid_utc_offsets_for_zone(iana_zone)
         if not valid_offsets:
-            # Cannot validate — be permissive to avoid false positives
             return True
 
-        # Allow 0.5 hour tolerance for half-hour zones (e.g., India UTC+5:30)
         for valid_off in valid_offsets:
             if abs(claimed_offset_hours - valid_off) < 0.6:
                 return True
         return False
 
-    # -------------------------------------------------------------------------
-    # Idea 3: Timezone-Aware Capture UTC Resolution
-    # -------------------------------------------------------------------------
 
     @classmethod
     def resolve_capture_utc(
@@ -749,10 +716,8 @@ class GeoLocator:
         if dt_naive is None:
             return None
 
-        # Strip any assumed UTC timezone for re-localization
         dt_naive = dt_naive.replace(tzinfo=None)
 
-        # 1. If explicit offset is provided, use it directly
         if offset_str and ":" in str(offset_str):
             try:
                 sign = -1 if str(offset_str).startswith("-") else 1
@@ -765,10 +730,8 @@ class GeoLocator:
             except Exception:
                 pass
 
-        # 2. Resolve IANA timezone from GPS coordinates
         iana_zone = cls.get_timezone(lat, lon)
         if iana_zone:
-            # Try zoneinfo first
             if _HAS_ZONEINFO:
                 try:
                     tz = ZoneInfo(iana_zone)
@@ -777,7 +740,6 @@ class GeoLocator:
                 except Exception:
                     pass
 
-            # Try pytz
             if _HAS_PYTZ:
                 try:
                     tz = pytz.timezone(iana_zone)
@@ -786,12 +748,8 @@ class GeoLocator:
                 except Exception:
                     pass
 
-        # 3. Fallback: treat as UTC (current behavior, preserves backward compat)
         return dt_naive.replace(tzinfo=timezone.utc)
 
-    # -------------------------------------------------------------------------
-    # Idea 5: Kinematic Speed Calculation
-    # -------------------------------------------------------------------------
 
     @classmethod
     def compute_kinematic_speed(
@@ -805,7 +763,6 @@ class GeoLocator:
             Dict with distance_km, time_delta_seconds, speed_kmh, is_anomalous.
             Returns None if timestamps are identical or coordinates are invalid.
         """
-        # Validate both coordinate pairs
         if cls.is_null_island(lat1, lon1) or cls.is_null_island(lat2, lon2):
             return None
 
@@ -816,7 +773,6 @@ class GeoLocator:
 
         distance_km = cls.compute_haversine_distance(lat1, lon1, lat2, lon2)
 
-        # Ensure both datetimes are timezone-aware for comparison
         if dt1.tzinfo is None:
             dt1 = dt1.replace(tzinfo=timezone.utc)
         if dt2.tzinfo is None:
@@ -824,11 +780,10 @@ class GeoLocator:
 
         time_delta_sec = abs((dt2 - dt1).total_seconds())
         if time_delta_sec < 1.0:
-            return None  # Cannot compute speed with zero time delta
+            return None
 
         speed_kmh = (distance_km / time_delta_sec) * 3600.0
 
-        # Threshold: > 1000 km/h is physically implausible without aviation
         is_anomalous = speed_kmh > 1000.0
 
         return {
@@ -842,9 +797,6 @@ class GeoLocator:
             ) if is_anomalous else None,
         }
 
-    # -------------------------------------------------------------------------
-    # Idea 6: Location Confidence Scoring
-    # -------------------------------------------------------------------------
 
     @classmethod
     def compute_location_confidence(
@@ -876,19 +828,17 @@ class GeoLocator:
                 },
             }
 
-        score = 0.5  # Base score for valid coordinates
+        score = 0.5
         signals: Dict[str, Any] = {
             "coordinate_status": COORD_VALID,
         }
 
-        # GPS satellite time verification
         if has_gps_timestamp:
             score += 0.2
             signals["gps_satellite_time"] = "present"
         else:
             signals["gps_satellite_time"] = "absent"
 
-        # Dilution of Precision
         if dop is not None:
             signals["gps_dop"] = dop
             if dop < 2.0:
@@ -904,7 +854,6 @@ class GeoLocator:
                 score -= 0.1
                 signals["dop_quality"] = "poor"
 
-        # Solar consistency check
         if solar_elevation is not None and day_phase is not None:
             sun_visible = solar_elevation > 0.0
             daylight_phase = day_phase in ("Daylight", "Golden Hour")
@@ -915,7 +864,6 @@ class GeoLocator:
                 score -= 0.15
                 signals["solar_consistency"] = "inconsistent"
 
-        # Determine level
         score = max(0.0, min(1.0, score))
         if score >= 0.8:
             level = LOC_CONFIDENCE_HIGH
@@ -930,9 +878,6 @@ class GeoLocator:
             "signals": signals,
         }
 
-    # -------------------------------------------------------------------------
-    # Idea 7: GeoJSON Spatial Boundary & Geofence Intelligence
-    # -------------------------------------------------------------------------
 
     @classmethod
     def load_geojson_features(cls, geojson_input: str | Path | Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -997,7 +942,6 @@ class GeoLocator:
               - matched_feature_properties: Dict
               - total_boundaries_checked: int
         """
-        # Validate coordinates first
         validation = cls.validate_coordinates(lat, lon)
         if not validation["is_valid"]:
             return {
@@ -1031,7 +975,6 @@ class GeoLocator:
                 if coords and len(coords) > 0:
                     outer_ring = coords[0]
                     if cls.point_in_polygon(lon, lat, outer_ring):
-                        # Check holes (inner rings)
                         in_hole = False
                         for hole in coords[1:]:
                             if cls.point_in_polygon(lon, lat, hole):
@@ -1071,9 +1014,6 @@ class GeoLocator:
             "total_boundaries_checked": checked_count,
         }
 
-    # -------------------------------------------------------------------------
-    # Idea 8: IP Geolocation Ingestion & GPS-to-IP Spatial Correlation
-    # -------------------------------------------------------------------------
 
     @classmethod
     def parse_ip_geolocation(cls, ip_data: Dict[str, Any] | str | Path) -> Optional[Dict[str, Any]]:
@@ -1119,7 +1059,6 @@ class GeoLocator:
         if not raw:
             return None
 
-        # Check status if ip-api.com format
         if raw.get("status") == "fail":
             return None
 
@@ -1134,7 +1073,6 @@ class GeoLocator:
         except (ValueError, TypeError):
             return None
 
-        # Validate coordinates
         val = cls.validate_coordinates(lat, lon)
         if not val["is_valid"]:
             return None
@@ -1191,12 +1129,10 @@ class GeoLocator:
         dist_miles = dist_res["distance_miles"]
         bearing_res = cls.compute_bearing(ip_lat, ip_lon, gps_lat, gps_lon)
 
-        # Timezone comparison
         gps_tz = cls.get_timezone(gps_lat, gps_lon)
         ip_tz = ip_info.get("timezone")
         tz_match = bool(gps_tz and ip_tz and gps_tz.lower() == ip_tz.lower())
 
-        # Determine correlation verdict
         if dist_km <= 60.0:
             verdict = "CORROBORATED_METRO"
             is_suspicious = False

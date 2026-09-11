@@ -5,7 +5,6 @@ import hashlib
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-# Standard Independent JPEG Group (IJG) base luminance quantization table
 IJG_LUMINANCE_BASE = [
     16, 11, 10, 16, 24, 40, 51, 61,
     12, 12, 14, 19, 26, 58, 60, 55,
@@ -17,7 +16,6 @@ IJG_LUMINANCE_BASE = [
     72, 92, 95, 98, 112, 100, 103, 99,
 ]
 
-# Standard IJG base chrominance quantization table
 IJG_CHROMINANCE_BASE = [
     17, 18, 24, 47, 99, 99, 99, 99,
     18, 21, 26, 66, 99, 99, 99, 99,
@@ -33,18 +31,17 @@ IJG_CHROMINANCE_BASE = [
 @dataclass
 class QuantizationTable:
     table_id: int
-    precision: int = 0  # 0 = 8-bit, 1 = 16-bit
+    precision: int = 0
     values: List[int] = None
     table_hash: str = ""
     estimated_quality: Optional[int] = None
-    table_type: str = "Unknown"  # "Luminance" (0), "Chrominance" (1), or "Custom"
+    table_type: str = "Unknown"
 
     def __post_init__(self):
         if self.values is None:
             self.values = []
 
 
-# Alias for backwards compatibility / shorthand
 DQTTable = QuantizationTable
 
 
@@ -103,14 +100,11 @@ class DqtExtractor:
         if len(values) < 64:
             return 50
 
-        # Guard: all-zeros table is malformed (would cause log(0) in matcher)
         if all(v == 0 for v in values[:64]):
             return 50
 
         base = IJG_LUMINANCE_BASE if table_id == 0 else IJG_CHROMINANCE_BASE
         ratios = []
-        # Sample low-to-mid frequency coefficients (indices 1-32) for better accuracy
-        # on non-standard encoders that deviate mainly in mid-high frequencies
         for i in range(1, min(33, len(values))):
             if base[i] > 0 and values[i] > 0:
                 ratios.append(values[i] / base[i])
@@ -122,9 +116,6 @@ class DqtExtractor:
         if avg_ratio <= 0:
             return 100
 
-        # IJG quality formula:
-        # If Q < 50: S = 5000 / Q => ratio = S / 100 = 50 / Q => Q = 50 / avg_ratio
-        # If Q >= 50: S = 200 - 2 * Q => ratio = S / 100 => Q = (200 - 100 * avg_ratio) / 2 = 100 - 50 * avg_ratio
         if avg_ratio > 1.0:
             q = int(round(50.0 / avg_ratio))
         else:

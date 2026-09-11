@@ -29,7 +29,7 @@ class OfficeContainerReader(ContainerReader):
         blocks: List[MetadataBlock] = []
         diagnostics: List[Diagnostic] = []
 
-        raw_data = reader.read_bytes(0, min(reader.size, 100 * 1024 * 1024))  # Up to 100MB
+        raw_data = reader.read_bytes(0, min(reader.size, 100 * 1024 * 1024))
 
         try:
             with zipfile.ZipFile(io.BytesIO(raw_data), "r") as zf:
@@ -41,7 +41,6 @@ class OfficeContainerReader(ContainerReader):
 
                 for info in infolist:
                     fname = info.filename
-                    # Check embedded media
                     if fname.startswith(("ppt/media/", "word/media/", "xl/media/")):
                         media_files.append(info)
                         img_bytes = zf.read(fname)
@@ -70,7 +69,6 @@ class OfficeContainerReader(ContainerReader):
                     elif fname.startswith("ppt/slides/"):
                         slides_files.append(info)
 
-                # Summary unit of all embedded media
                 units.append(
                     StructuralUnit(
                         name="OFFICE_MEDIA_COLLECTION",
@@ -82,7 +80,6 @@ class OfficeContainerReader(ContainerReader):
                     )
                 )
 
-                # Parse docProps/core.xml (Dublin Core Metadata)
                 if "docProps/core.xml" in zf.namelist():
                     core_bytes = zf.read("docProps/core.xml")
                     blocks.append(
@@ -96,7 +93,6 @@ class OfficeContainerReader(ContainerReader):
                     )
                     self._parse_core_properties(core_bytes, units)
 
-                # Parse docProps/app.xml (Extended Application Properties)
                 if "docProps/app.xml" in zf.namelist():
                     app_bytes = zf.read("docProps/app.xml")
                     blocks.append(
@@ -110,7 +106,6 @@ class OfficeContainerReader(ContainerReader):
                     )
                     self._parse_app_properties(app_bytes, units)
 
-                # Parse speaker notes for hidden text
                 for n_info in notes_files:
                     try:
                         n_bytes = zf.read(n_info.filename)

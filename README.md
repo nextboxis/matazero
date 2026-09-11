@@ -13,6 +13,7 @@
 ### Evidence-Grade Image Intelligence & Forensic Toolkit for OSINT
 
 [![Release](https://img.shields.io/badge/release-v2.1.0-blue.svg?style=flat-square)](https://github.com/nextboxis/matazero/releases)
+[![Tests](https://img.shields.io/badge/tests-34%20passed-success.svg?style=flat-square&logo=pytest)](tests/)
 [![Container](https://img.shields.io/badge/docker-ghcr.io-blueviolet.svg?style=flat-square&logo=docker)](https://github.com/users/nextboxis/packages?repo_name=matazero)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-informational.svg?style=flat-square&logo=python)](https://python.org)
 [![Air-Gapped OPSEC](https://img.shields.io/badge/opsec-100%25%20offline-success.svg?style=flat-square)](docs/SECURITY.md)
@@ -26,6 +27,7 @@
   <a href="#-docker--container-package">Docker</a> •
   <a href="#-quickstart--usage">Quickstart</a> •
   <a href="#-cli-reference">CLI Reference</a> •
+  <a href="#-testing--quality-assurance">Testing</a> •
   <a href="#-guarantees">Guarantees</a>
 </p>
 
@@ -281,6 +283,59 @@ Core Commands:
 | `extract` | `-c` | `--payload` | Extract trailing payload archives past EOI |
 
 </details>
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+`matazero` maintains a rigorous automated test suite to ensure forensic precision, cross-platform file locking safety, and deterministic analytical outcomes.
+
+```bash
+# Run complete test suite with coverage
+pytest
+
+# Run specific subsystem test modules
+pytest tests/test_cleaner.py      # Metadata stripping & zeroization tests
+pytest tests/test_diff.py         # Forensic diff & comparison tests
+pytest tests/test_reader.py       # Memory-mapped BoundedReader lifecycle tests
+pytest tests/test_containers.py   # JPEG, PNG, TIFF container parsers
+pytest tests/test_pipeline.py     # 7-tier forensic extraction pipeline
+```
+
+* **Deterministic Resource Management**: Every file reader wraps OS handles in strict `try ... finally` lifecycles to prevent Windows memory-mapped lock issues (`WinError 32`).
+* **Silent Error Elimination**: All exception handlers utilize structured logging to maintain an airtight audit trail without dropping forensic anomalies.
+
+---
+
+## 🏛️ Architecture & Modular Engine
+
+The CLI and core analytical pipeline follow a decoupled, modular design:
+
+```
+matazero/
+├── imgint/
+│   ├── cli/
+│   │   ├── main.py               # Top-level CLI argument routing & parser
+│   │   └── commands/             # Dedicated modular subcommands
+│   │       ├── analyze.py        # 7-tier pipeline execution
+│   │       ├── ask.py            # Local Ollama vision interrogation
+│   │       ├── clean.py          # Lossless metadata cleaning
+│   │       ├── diff.py           # Multi-tier image comparison
+│   │       ├── doctor.py         # Diagnostic health checker
+│   │       ├── extract.py        # Artefact & payload carving
+│   │       ├── locate.py         # Chronolocation & reverse geocoding
+│   │       ├── scan.py           # Bulk triage & HTML dossier generation
+│   │       └── ...               # Additional specialized subcommands
+│   └── core/
+│       ├── analyzer/             # CFA, Copy-Move, Ghost, Hashes, Indicators
+│       ├── artefact/             # IFD1, MPF, previews, payload carver
+│       ├── container/            # Format parsers (JPEG, PNG, GIF, BMFF, TIFF)
+│       ├── evidence/             # Cryptographic custody & evidence store
+│       ├── fingerprint/          # DQT, DHT, ISP hardware corpus matching
+│       ├── geo/                  # Offline geocoding & solar chronolocation
+│       └── sandbox/              # Subprocess isolation for decoding tasks
+└── tests/                        # Full regression & unit test suite
+```
 
 ---
 

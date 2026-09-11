@@ -75,7 +75,6 @@ class GeoTimeAnalyzer(Analyzer):
         lat_dec: Optional[float] = None
         lon_dec: Optional[float] = None
 
-        # FR-6.1: Convert GPS rational triplets to signed decimal degrees
         if lat_raw and lon_raw:
             try:
                 lat_dec = self._convert_dms_to_decimal(lat_raw, lat_ref)
@@ -83,15 +82,11 @@ class GeoTimeAnalyzer(Analyzer):
             except Exception as e:
                 diagnostics.append(Diagnostic(level="warning", message=f"GPS coordinate conversion failed: {e}", source="geotime_analyzer"))
 
-        # =====================================================================
-        # IDEA 1: Coordinate Sanitization & Null Island Detection
-        # =====================================================================
         coords_valid = False
         if lat_dec is not None and lon_dec is not None:
             coord_validation = GeoLocator.validate_coordinates(lat_dec, lon_dec)
 
             if not coord_validation["is_valid"]:
-                # Emit a specialized finding instead of gps_coordinates_claimed
                 lat_field = ctx.get_field("GPSLatitude")
                 lon_field = ctx.get_field("GPSLongitude")
 
@@ -129,7 +124,6 @@ class GeoTimeAnalyzer(Analyzer):
                         source="geotime_analyzer",
                     )
                 )
-                # DO NOT proceed with geocoding or solar computations
                 lat_dec = None
                 lon_dec = None
             else:
@@ -179,9 +173,6 @@ class GeoTimeAnalyzer(Analyzer):
                 )
             )
 
-            # =================================================================
-            # IDEA 2: Distance-Capped & Hierarchical Reverse Geocoding
-            # =================================================================
             offline_place = GeoLocator.reverse_geocode_offline(lat_dec, lon_dec, max_distance_km=150.0)
             if offline_place:
                 is_approx = offline_place.get("is_approximate", False)
@@ -205,7 +196,6 @@ class GeoTimeAnalyzer(Analyzer):
                     )
                 )
 
-            # Facility Proximity Context (Airports, Ports) from Natural Earth DB
             facility_ctx = GeoLocator.get_facility_context(lat_dec, lon_dec, airport_max_km=50.0, port_max_km=30.0)
             if facility_ctx.get("has_facility_proximity"):
                 findings.append(
@@ -221,7 +211,6 @@ class GeoTimeAnalyzer(Analyzer):
                 )
 
 
-        # GPS Altitude & DOP (FR-6.2)
         if alt_raw:
             alt_m = self._convert_rational_to_float(alt_raw)
             if alt_ref in (1, "1"):
@@ -238,7 +227,6 @@ class GeoTimeAnalyzer(Analyzer):
                 )
             )
 
-        # Parse DOP for confidence scoring
         dop_value: Optional[float] = None
         if dop_raw:
             try:
@@ -246,7 +234,6 @@ class GeoTimeAnalyzer(Analyzer):
             except Exception:
                 pass
 
-        # GPS Sensor Telemetry & Hardware GNSS Integrity Analysis
         if coords_valid and lat_dec is not None and lon_dec is not None:
             telemetry: Dict[str, Any] = {
                 "has_satellite_data": bool(gps_satellites),
@@ -291,14 +278,10 @@ class GeoTimeAnalyzer(Analyzer):
             )
 
 
-        # =====================================================================
-        # IDEA 3: Timezone-Aware Solar Chronolocation
-        # =====================================================================
         dt_capture = self._parse_datetime(date_orig)
         dt_capture_utc: Optional[datetime] = None
 
         if coords_valid and lat_dec is not None and lon_dec is not None and dt_capture is not None:
-            # Resolve true UTC using IANA timezone lookup (instead of assuming UTC)
             dt_capture_utc = GeoLocator.resolve_capture_utc(
                 str(date_orig), lat_dec, lon_dec, offset_str=offset_time
             )
@@ -307,7 +290,6 @@ class GeoTimeAnalyzer(Analyzer):
                 lat_dec, lon_dec, dt_capture_utc or dt_capture
             )
             if solar_pos:
-                # Add a note about how UTC was resolved
                 utc_method = "explicit_offset" if offset_time else "iana_timezone_inference"
                 solar_pos["utc_resolution_method"] = utc_method
 
@@ -333,7 +315,6 @@ class GeoTimeAnalyzer(Analyzer):
                     )
                 )
 
-                # Astronomical Physical Shadow Geometry Analysis
                 solar_el = solar_pos.get("solar_elevation_degrees", 0.0)
                 solar_az = solar_pos.get("solar_azimuth_degrees", 0.0)
                 if solar_el > 0.5:
@@ -366,7 +347,6 @@ class GeoTimeAnalyzer(Analyzer):
                         )
                     )
 
-        # Optical Viewing Cone & Camera Sightline Frustum
         if coords_valid and lat_dec is not None and lon_dec is not None and gps_img_dir is not None:
             try:
                 img_dir_val = self._convert_rational_to_float(gps_img_dir)
@@ -396,7 +376,6 @@ class GeoTimeAnalyzer(Analyzer):
             except Exception:
                 pass
 
-        # FR-6.5: Cross-check DateTimeOriginal vs GPSDateStamp
         if date_orig and gps_date:
             date_orig_prefix = str(date_orig).replace(":", "-")[:10]
             gps_date_clean = str(gps_date).replace(":", "-")[:10]
@@ -417,10 +396,6 @@ class GeoTimeAnalyzer(Analyzer):
                     )
                 )
 
-        # =====================================================================
-        # IDEA 4: IANA Polygon-Based Timezone Consistency
-        # (Replaces the crude lon / 15.0 heuristic that false-flagged China, Spain, etc.)
-        # =====================================================================
         if offset_time and coords_valid and lon_dec is not None and lat_dec is not None:
             try:
                 sign = -1 if offset_time.startswith("-") else 1
@@ -428,15 +403,12 @@ class GeoTimeAnalyzer(Analyzer):
                 hours = int(parts[0]) + (int(parts[1]) / 60.0 if len(parts) > 1 else 0)
                 claimed_tz_offset = sign * hours
 
-                # Resolve the IANA timezone for this location
                 iana_zone = GeoLocator.get_timezone(lat_dec, lon_dec)
 
                 if iana_zone:
-                    # Check if the claimed offset is valid for this specific IANA zone
                     is_valid_offset = GeoLocator.is_offset_valid_for_zone(iana_zone, claimed_tz_offset)
 
                     if not is_valid_offset:
-                        # Get the list of valid offsets for the diagnostic message
                         valid_offsets = GeoLocator.get_valid_utc_offsets_for_zone(iana_zone)
                         findings.append(
                             Finding(
@@ -460,10 +432,9 @@ class GeoTimeAnalyzer(Analyzer):
                             )
                         )
                 else:
-                    # Fallback: cannot resolve IANA zone, use permissive solar offset as last resort
                     expected_tz_approx = lon_dec / 15.0
                     diff = abs(claimed_tz_offset - expected_tz_approx)
-                    if diff > 4.0:  # Wider tolerance than before (was 3.0)
+                    if diff > 4.0:
                         findings.append(
                             Finding(
                                 name="timezone_longitude_inconsistency",
@@ -487,25 +458,18 @@ class GeoTimeAnalyzer(Analyzer):
             except Exception:
                 pass
 
-        # =====================================================================
-        # IDEA 5: Filesystem mtime Tolerance for Timezone Shifts
-        # (Eliminates false positives from archive extraction and timezone conversions)
-        # =====================================================================
         try:
             mtime_epoch = ctx.file_path.stat().st_mtime
             if dt_capture:
                 capture_epoch = (dt_capture_utc or dt_capture).timestamp()
                 delta_seconds = mtime_epoch - capture_epoch
 
-                if delta_seconds < -60:  # mtime precedes capture time
-                    # Check if the discrepancy aligns with a timezone offset boundary.
-                    # Timezone offsets come in 15-minute granularity (UTC+5:30, UTC+5:45, etc.)
+                if delta_seconds < -60:
                     abs_delta = abs(delta_seconds)
-                    remainder_15min = abs_delta % 900  # 900 seconds = 15 minutes
-                    is_timezone_shift = remainder_15min < 120 or remainder_15min > 780  # Within 2 min of a 15-min boundary
+                    remainder_15min = abs_delta % 900
+                    is_timezone_shift = remainder_15min < 120 or remainder_15min > 780
 
-                    if is_timezone_shift and abs_delta < 86400:  # Less than 24 hours and timezone-aligned
-                        # This is almost certainly a timezone conversion artifact, not timestomping
+                    if is_timezone_shift and abs_delta < 86400:
                         diagnostics.append(
                             Diagnostic(
                                 level="info",
@@ -518,7 +482,6 @@ class GeoTimeAnalyzer(Analyzer):
                             )
                         )
                     else:
-                        # Genuine anomaly: non-hour-aligned or very large delta
                         findings.append(
                             Finding(
                                 name="filesystem_mtime_precedes_capture",
@@ -543,11 +506,7 @@ class GeoTimeAnalyzer(Analyzer):
         except Exception:
             pass
 
-        # =====================================================================
-        # IDEA 6: Location Confidence Scoring
-        # =====================================================================
         if coords_valid and lat_dec is not None and lon_dec is not None:
-            # Gather signals for confidence computation
             has_gps_ts = bool(gps_date and gps_time)
 
             solar_el: Optional[float] = None
