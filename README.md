@@ -13,7 +13,7 @@
 ### Evidence-Grade Image Intelligence & Forensic Toolkit for OSINT
 
 [![Release](https://img.shields.io/badge/release-v2.1.0-blue.svg?style=flat-square)](https://github.com/nextboxis/matazero/releases)
-[![Tests](https://img.shields.io/badge/tests-27%20passed-success.svg?style=flat-square&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/tests-34%20passed-success.svg?style=flat-square&logo=pytest)](tests/)
 [![Container](https://img.shields.io/badge/docker-ghcr.io-blueviolet.svg?style=flat-square&logo=docker)](https://github.com/users/nextboxis/packages?repo_name=matazero)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-informational.svg?style=flat-square&logo=python)](https://python.org)
 [![Air-Gapped OPSEC](https://img.shields.io/badge/opsec-100%25%20offline-success.svg?style=flat-square)](docs/SECURITY.md)

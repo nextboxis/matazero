@@ -13,7 +13,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from imgint import __version__
-from imgint.cli.commands._utils import resolve_scope, ExitCode, expand_targets, IMAGE_EXTENSIONS
+from imgint.cli.commands._utils import resolve_scope, ExitCode, expand_targets, _expand_file_targets, IMAGE_EXTENSIONS
 from imgint.core.evidence.store import EvidenceStore, EvidenceCustodyError
 from imgint.core.governance.audit import AuditLogger, verify_audit_chain
 from imgint.core.governance.scope import AuthorizationScope, ScopeValidationError

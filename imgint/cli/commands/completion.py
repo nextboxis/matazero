@@ -63,7 +63,3 @@ def completion(shell: str) -> None:
     elif shell == "fish":
         console.print('# fish completion for matazero\neval (env _MATAZERO_COMPLETE=fish_source matazero)')
 
-
-def main() -> None:
-    cli()
-
