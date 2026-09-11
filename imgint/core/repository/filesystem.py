@@ -27,11 +27,9 @@ class FilesystemEvidenceRepository(EvidenceRepository):
         if not target_file.exists():
             return None
         try:
-            # Load from JSON file
             data = json.loads(target_file.read_text(encoding="utf-8"))
             if isinstance(data, list) and len(data) > 0:
                 data = data[0]
-            # Reconstruct basic AnalysisRecord
             rec = AnalysisRecord(
                 file_path=data.get("file_path", ""),
                 file_size=data.get("file_size", 0),

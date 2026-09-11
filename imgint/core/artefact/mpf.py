@@ -12,7 +12,7 @@ class MpfImage:
     index: int
     offset: int
     length: int
-    image_type: str  # e.g., "Primary", "Large Thumbnail", "Depth Map", "Panorama"
+    image_type: str
 
 
 class MpfExtractor:
@@ -34,7 +34,6 @@ class MpfExtractor:
         else:
             return images
 
-        # Locate MP Index IFD
         if len(data) >= 8:
             first_ifd_offset = struct.unpack(f"{endian}I", data[4:8])[0]
             if 0 < first_ifd_offset < size - 2:

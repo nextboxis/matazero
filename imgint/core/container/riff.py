@@ -83,7 +83,6 @@ class RiffContainerReader(ContainerReader):
             )
 
             if fourcc.strip() == "EXIF":
-                # WebP EXIF chunk
                 raw_exif = payload_bytes
                 if raw_exif.startswith(b"Exif\x00\x00"):
                     raw_exif = raw_exif[6:]

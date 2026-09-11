@@ -75,10 +75,8 @@ class AnalysisPipeline:
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
-        # Enforce GR-1.1 & GR-1.3 Scope checks
         self._validate_scope()
 
-        # Ingest into evidence store or compute hash
         file_sha256, working_path = self._ingest_evidence(path)
 
         if self.audit_logger:
@@ -93,46 +91,40 @@ class AnalysisPipeline:
 
         record = self._create_initial_record(path, working_path, file_sha256)
         reader = BoundedReader(working_path)
+        try:
+            detected, units, blocks = self._detect_format_and_walk(path, reader, record)
+            if detected is None:
+                return record
 
-        # Format detection and container walking (Tiers 1 & 2)
-        detected, units, blocks = self._detect_format_and_walk(path, reader, record)
-        if detected is None:
+            all_fields = self._parse_metadata(blocks, record)
+
+            self._extract_fingerprints(detected.format_name, units, record)
+
+            self._extract_artefacts(reader, detected.format_name, units, blocks, record)
+
+            ctx = AnalysisContext(
+                file_path=working_path,
+                reader=reader,
+                format_name=detected.format_name,
+                structural_units=units,
+                metadata_blocks=blocks,
+                fields=all_fields,
+                existing_findings=record.findings,
+                diagnostics=record.diagnostics,
+                scope=self.scope,
+                allow_network=self.allow_network,
+                enable_ela=self.enable_ela,
+            )
+
+            self._run_analyzers(ctx, record)
+
+            self._evaluate_verdict(path, file_sha256, record)
+
+            self._finalize_analysis(path, file_sha256, record)
+
             return record
-
-        # Tier 1 Metadata Parsing
-        all_fields = self._parse_metadata(blocks, record)
-
-        # Tier 2 Structural Fingerprints
-        self._extract_fingerprints(detected.format_name, units, record)
-
-        # Tier 3 Embedded Artefacts
-        self._extract_artefacts(reader, detected.format_name, units, blocks, record)
-
-        # Context for Tiers 4-7 Analyzers
-        ctx = AnalysisContext(
-            file_path=working_path,
-            reader=reader,
-            format_name=detected.format_name,
-            structural_units=units,
-            metadata_blocks=blocks,
-            fields=all_fields,
-            existing_findings=record.findings,
-            diagnostics=record.diagnostics,
-            scope=self.scope,
-            allow_network=self.allow_network,
-            enable_ela=self.enable_ela,
-        )
-
-        # Execute Permitted Analyzers & Skills (Tiers 4-7)
-        self._run_analyzers(ctx, record)
-
-        # Authenticity & Integrity Verdict
-        self._evaluate_verdict(path, file_sha256, record)
-
-        # Finalize custody check, audit log, and events
-        self._finalize_analysis(path, file_sha256, record)
-
-        return record
+        finally:
+            reader.close()
 
     def _validate_scope(self) -> None:
         """Enforces scope presence and expiration (GR-1.1, GR-1.3)."""
@@ -270,7 +262,6 @@ class AnalysisPipeline:
             )
         )
 
-        # Match against Reference Corpus (FR-3.7, FR-3.8)
         match_finding = FingerprintMatcher.match(fp, self.corpus)
         record.add_finding(match_finding)
 
@@ -286,7 +277,6 @@ class AnalysisPipeline:
         if 3 not in self.selected_tiers or not (self.scope and self.scope.is_analyzer_permitted("artefact_extractor", 3)):
             return
 
-        # Check IFD1 thumbnail & secondary MPF images
         for b in blocks:
             if b.kind == "EXIF":
                 thumb = ThumbnailExtractor.extract_from_exif_block(b)
@@ -321,7 +311,6 @@ class AnalysisPipeline:
                         )
                     )
 
-        # Trailing data
         for u in units:
             if u.name == "TRAILING_DATA":
                 trailing_info = TrailingDataExtractor.analyze(u, reader.get_all_bytes())
@@ -348,7 +337,6 @@ class AnalysisPipeline:
                     )
                 )
 
-        # Container anomalies
         anomalies = ContainerAnomalyDetector.detect_anomalies(units, detected_format)
         for a in anomalies:
             record.add_finding(a)
@@ -371,7 +359,6 @@ class AnalysisPipeline:
                                 message=f"Analyzer {analyzer.id} failed: {e}",
                                 source=analyzer.id,
                             )
-                # Dynamic skills for this tier
                 for skill in skill_reg.get_skills_for_tier(tier, ctx.format_name):
                     try:
                         f_list, d_list = skill.analyze(ctx)
@@ -385,7 +372,6 @@ class AnalysisPipeline:
                             source=skill.id,
                         )
 
-        # Tier 7: Optional Ollama Local Vision Inspection
         if 7 in self.selected_tiers and self.ollama_model:
             try:
                 ai_findings, ai_diagnostics = OllamaVisionAnalyzer.analyze(ctx, self.ollama_model)
@@ -399,7 +385,6 @@ class AnalysisPipeline:
                     source="ollama_vision_analyzer",
                 )
 
-        # Update data stream hash on record
         for f in record.findings:
             if f.name == "image_data_stream_sha256":
                 record.data_stream_sha256 = f.value

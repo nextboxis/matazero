@@ -40,7 +40,6 @@ class ThumbnailExtractor:
         if first_ifd_offset <= 0 or first_ifd_offset + 2 > size:
             return None
 
-        # Find IFD1 by skipping IFD0 entries
         entry_count = struct.unpack(f"{endian}H", data[first_ifd_offset : first_ifd_offset + 2])[0]
         next_ptr_offset = first_ifd_offset + 2 + entry_count * 12
 
@@ -51,7 +50,6 @@ class ThumbnailExtractor:
         if ifd1_offset <= 0 or ifd1_offset + 2 > size:
             return None
 
-        # Parse IFD1
         ifd1_count = struct.unpack(f"{endian}H", data[ifd1_offset : ifd1_offset + 2])[0]
         curr = ifd1_offset + 2
 
@@ -66,9 +64,9 @@ class ThumbnailExtractor:
             )
             curr += 12
 
-            if tag_id == 0x0201:  # JPEGInterchangeFormat
+            if tag_id == 0x0201:
                 thumb_offset = val_or_offset
-            elif tag_id == 0x0202:  # JPEGInterchangeFormatLength
+            elif tag_id == 0x0202:
                 thumb_len = val_or_offset
 
         if thumb_offset is not None and thumb_len is not None:

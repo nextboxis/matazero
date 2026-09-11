@@ -66,7 +66,6 @@ class OllamaClient:
         v_models = self.list_vision_models()
         if v_models:
             return v_models[0]
-        # Fallback to any model if tags exist
         all_models = self.list_models()
         if all_models:
             return all_models[0].get("name")

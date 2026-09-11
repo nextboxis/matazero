@@ -30,7 +30,6 @@ class SkillManifest:
         if p.suffix.lower() == ".json":
             data = json.loads(content)
         else:
-            # Basic YAML-like parser without hard yaml dependency
             data = {}
             for line in content.splitlines():
                 if ":" in line and not line.strip().startswith("#"):

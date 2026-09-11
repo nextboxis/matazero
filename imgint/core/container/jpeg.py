@@ -67,7 +67,6 @@ class JpegContainerReader(ContainerReader):
         size = reader.size
         offset = 0
 
-        # Verify SOI
         if size < 2 or reader.read_bytes(0, 2) != b"\xFF\xD8":
             diagnostics.append(
                 Diagnostic(level="error", message="Missing JPEG SOI marker", source="jpeg_reader", offset=0)
@@ -98,14 +97,11 @@ class JpegContainerReader(ContainerReader):
                 )
                 break
 
-            # Find next marker: must begin with 0xFF
             b = reader.read_u8(offset)
             if b != 0xFF:
                 if in_scan:
-                    # Scan forward looking for next 0xFF
                     next_ff = reader.find(b"\xFF", offset)
                     if next_ff == -1:
-                        # Reached EOF without marker
                         break
                     offset = next_ff
                     continue
@@ -118,14 +114,12 @@ class JpegContainerReader(ContainerReader):
                             offset=offset,
                         )
                     )
-                    # Advance to next 0xFF
                     next_ff = reader.find(b"\xFF", offset + 1)
                     if next_ff == -1:
                         break
                     offset = next_ff
                     continue
 
-            # Skip fill bytes 0xFF
             while offset + 1 < size and reader.read_u8(offset + 1) == 0xFF:
                 offset += 1
 
@@ -135,12 +129,10 @@ class JpegContainerReader(ContainerReader):
             marker = reader.read_u8(offset + 1)
             marker_offset = offset
 
-            # 0x00 is byte stuffing in entropy stream
             if marker == 0x00:
                 offset += 2
                 continue
 
-            # Restart markers RST0 - RST7 (0xD0 - 0xD7) have no payload length
             if 0xD0 <= marker <= 0xD7:
                 units.append(
                     StructuralUnit(
@@ -155,7 +147,6 @@ class JpegContainerReader(ContainerReader):
                 offset += 2
                 continue
 
-            # EOI (End of Image) 0xD9
             if marker == 0xD9:
                 units.append(
                     StructuralUnit(
@@ -171,7 +162,6 @@ class JpegContainerReader(ContainerReader):
                 eoi_found = True
                 in_scan = False
 
-                # Check for trailing data after EOI
                 if offset < size:
                     trailing_len = size - offset
                     units.append(
@@ -187,7 +177,6 @@ class JpegContainerReader(ContainerReader):
                     )
                 break
 
-            # Markers with 2-byte big-endian length payload
             if offset + 4 > size:
                 diagnostics.append(
                     Diagnostic(
@@ -241,8 +230,7 @@ class JpegContainerReader(ContainerReader):
             )
             units.append(unit)
 
-            # Metadata extraction from APP markers
-            if marker == 0xE1:  # APP1
+            if marker == 0xE1:
                 if payload_bytes.startswith(b"Exif\x00\x00"):
                     blocks.append(
                         MetadataBlock(
@@ -273,7 +261,7 @@ class JpegContainerReader(ContainerReader):
                             source_unit="APP1_XMP_EXTENDED",
                         )
                     )
-            elif marker == 0xE2:  # APP2
+            elif marker == 0xE2:
                 if payload_bytes.startswith(b"ICC_PROFILE\x00"):
                     blocks.append(
                         MetadataBlock(
@@ -294,7 +282,7 @@ class JpegContainerReader(ContainerReader):
                             source_unit="APP2_MPF",
                         )
                     )
-            elif marker == 0xED:  # APP13 (Photoshop / IPTC)
+            elif marker == 0xED:
                 if payload_bytes.startswith(b"Photoshop 3.0\x00"):
                     blocks.append(
                         MetadataBlock(
@@ -305,7 +293,7 @@ class JpegContainerReader(ContainerReader):
                             source_unit="APP13_PHOTOSHOP",
                         )
                     )
-            elif marker == 0xEB:  # APP11 (C2PA)
+            elif marker == 0xEB:
                 blocks.append(
                     MetadataBlock(
                         kind="C2PA",
@@ -315,7 +303,7 @@ class JpegContainerReader(ContainerReader):
                         source_unit="APP11_C2PA",
                     )
                 )
-            elif marker == 0xE0:  # APP0 (JFIF)
+            elif marker == 0xE0:
                 if payload_bytes.startswith(b"JFIF\x00"):
                     blocks.append(
                         MetadataBlock(
@@ -327,10 +315,9 @@ class JpegContainerReader(ContainerReader):
                         )
                     )
 
-            if marker == 0xDA:  # SOS (Start of Scan)
+            if marker == 0xDA:
                 in_scan = True
                 offset = data_offset + data_len
-                # In scan mode, we seek for the next marker (like EOI)
                 continue
 
             offset += total_segment_len

@@ -26,19 +26,16 @@ class C2paParser(BlockParser):
         claim_generator = "Unknown"
         actions_found: List[str] = []
 
-        # Extract claim generator if present
         if b"claim_generator" in data:
             idx = data.find(b"claim_generator")
             claim_bytes = data[idx : idx + 200]
             text = claim_bytes.decode("utf-8", errors="ignore")
-            # Match "claim_generator": "Adobe Photoshop 2024" or claim_generator="Tool"
             m = re.search(r'claim_generator["\s:]+([^"\r\n,}]+)', text)
             if m:
                 claim_generator = m.group(1).strip().strip('"')
             else:
                 claim_generator = "C2PA_Manifest"
 
-        # Search for standard C2PA action assertions
         known_actions = [
             b"c2pa.created",
             b"c2pa.cropped",
@@ -53,7 +50,6 @@ class C2paParser(BlockParser):
             if act in data:
                 actions_found.append(act.decode("ascii"))
 
-        # Look for signature info / signing authority strings
         signer_info = "Self-contained assertion"
         if b"CN=" in data or b"OU=" in data:
             signer_info = "X.509 Certificate Chain Present"

@@ -8,7 +8,6 @@ from imgint.core.model.record import MetadataBlock, Field, Diagnostic
 from imgint.core.standard.base import BlockParser
 
 EXIF_TAGS = {
-    # IFD0 / Main
     0x010E: "ImageDescription",
     0x010F: "Make",
     0x0110: "Model",
@@ -22,7 +21,6 @@ EXIF_TAGS = {
     0x8298: "Copyright",
     0x8769: "ExifOffset",
     0x8825: "GPSInfo",
-    # SubIFD 0x8769
     0x829A: "ExposureTime",
     0x829D: "FNumber",
     0x8822: "ExposureProgram",
@@ -40,7 +38,7 @@ EXIF_TAGS = {
     0x9208: "LightSource",
     0x9209: "Flash",
     0x920A: "FocalLength",
-    0x927C: "MakerNote",  # Preserved as opaque blob per FR-2.10
+    0x927C: "MakerNote",
     0x9286: "UserComment",
     0x9290: "SubSecTime",
     0x9291: "SubSecTimeOriginal",
@@ -56,7 +54,6 @@ EXIF_TAGS = {
     0xA433: "LensMake",
     0xA434: "LensModel",
     0xA435: "LensSerialNumber",
-    # IFD1 (Thumbnail)
     0x0201: "JPEGInterchangeFormat",
     0x0202: "JPEGInterchangeFormatLength",
 }
@@ -182,7 +179,6 @@ class ExifParser(BlockParser):
                     val_abs_offset = block.offset + val_or_offset
                     val_len = total_val_bytes
 
-                # FR-2.10: Preserve MakerNote as opaque blob
                 if tag_id == 0x927C:
                     maker_offset = val_or_offset
                     maker_len = count
@@ -219,23 +215,20 @@ class ExifParser(BlockParser):
                             ),
                         )
                     )
-                    # Extract decoded MakerNote sub-fields if recognized
                     decoded_fields = self._parse_makernote(data, maker_offset, maker_len, endian, block.offset)
                     fields.extend(decoded_fields)
                     continue
 
-                # Recurse into sub-IFDs
-                if tag_id == 0x8769:  # ExifOffset
+                if tag_id == 0x8769:
                     parse_ifd(val_or_offset, "ExifSubIFD", depth + 1)
                     continue
-                elif tag_id == 0x8825:  # GPSInfo
+                elif tag_id == 0x8825:
                     parse_ifd(val_or_offset, "GPSInfo", depth + 1)
                     continue
-                elif tag_id == 0xA005:  # InteropOffset
+                elif tag_id == 0xA005:
                     parse_ifd(val_or_offset, "InteropIFD", depth + 1)
                     continue
 
-                # Value extraction per type
                 val, val_type_name = self._extract_value(data, endian, field_type, count, val_or_offset)
                 if val is not None:
                     fields.append(
@@ -251,7 +244,6 @@ class ExifParser(BlockParser):
                             length=val_len,
                         )
                     )
-                    # Produce Tier-1 observed finding for prominent metadata tags
                     should_emit_finding = False
                     if ifd_name == "GPSInfo" and tag_id in (0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007, 0x001D):
                         should_emit_finding = True
@@ -280,7 +272,6 @@ class ExifParser(BlockParser):
                             )
                         )
 
-            # Check next IFD pointer (e.g. IFD1)
             if curr + 4 <= size:
                 next_ifd = struct.unpack(f"{endian}I", data[curr : curr + 4])[0]
                 if next_ifd > 0 and next_ifd < size:
@@ -293,8 +284,7 @@ class ExifParser(BlockParser):
         self, data: bytes, endian: str, field_type: int, count: int, val_or_offset: int
     ) -> Tuple[Any, str]:
         size = len(data)
-        # Type map: 1=BYTE, 2=ASCII, 3=SHORT, 4=LONG, 5=RATIONAL, 6=SBYTE, 7=UNDEF, 8=SSHORT, 9=SLONG, 10=SRATIONAL, 11=FLOAT, 12=DOUBLE
-        if field_type == 2:  # ASCII
+        if field_type == 2:
             if count <= 4:
                 raw = struct.pack(f"{endian}I", val_or_offset)[:count]
             else:
@@ -305,7 +295,7 @@ class ExifParser(BlockParser):
             s = raw.split(b"\x00")[0].decode("utf-8", errors="replace").strip()
             return s, "ASCII"
 
-        elif field_type == 3:  # SHORT
+        elif field_type == 3:
             if count == 1:
                 if endian == ">":
                     s_val = (val_or_offset >> 16) if (val_or_offset >> 16) != 0 else (val_or_offset & 0xFFFF)
@@ -320,7 +310,7 @@ class ExifParser(BlockParser):
                         off += 2
                 return vals, "SHORT[]"
 
-        elif field_type == 4:  # LONG
+        elif field_type == 4:
             if count == 1:
                 return val_or_offset, "LONG"
             else:
@@ -332,7 +322,7 @@ class ExifParser(BlockParser):
                         off += 4
                 return vals, "LONG[]"
 
-        elif field_type in (5, 10):  # RATIONAL / SRATIONAL (Preserved as integer pair per FR-2.3)
+        elif field_type in (5, 10):
             fmt = f"{endian}ii" if field_type == 10 else f"{endian}II"
             typename = "SRATIONAL" if field_type == 10 else "RATIONAL"
             if count == 1:
@@ -350,10 +340,10 @@ class ExifParser(BlockParser):
                         off += 8
                 return pairs, f"{typename}[]"
 
-        elif field_type == 1:  # BYTE
+        elif field_type == 1:
             return val_or_offset & 0xFF, "BYTE"
 
-        elif field_type == 7:  # UNDEFINED
+        elif field_type == 7:
             if count <= 4:
                 return list(struct.pack(f"{endian}I", val_or_offset)[:count]), "UNDEFINED"
             return f"<Undefined blob: {count} bytes>", "UNDEFINED"
@@ -371,7 +361,6 @@ class ExifParser(BlockParser):
 
         fields: List[Field] = []
 
-        # 1. Nikon 2/3 (Starts with b"Nikon\x00\x02" or b"Nikon\x00\x01")
         if raw_blob.startswith(b"Nikon\x00\x02") or raw_blob.startswith(b"Nikon\x00\x01"):
             hdr_len = 10 if raw_blob.startswith(b"Nikon\x00\x02") else 8
             sub_data = raw_blob[hdr_len:]
@@ -390,7 +379,6 @@ class ExifParser(BlockParser):
                 }
                 fields.extend(self._parse_sub_ifd(sub_data, ifd_start, nikon_endian, nikon_tags, "Nikon", maker_offset + hdr_len, block_abs_offset))
 
-        # 2. Apple (Starts with b"Apple iOS\x00")
         elif raw_blob.startswith(b"Apple iOS\x00"):
             sub_data = raw_blob[14:]
             apple_tags = {
@@ -401,7 +389,6 @@ class ExifParser(BlockParser):
             }
             fields.extend(self._parse_sub_ifd(sub_data, 0, parent_endian, apple_tags, "Apple", maker_offset + 14, block_abs_offset))
 
-        # 3. Sony (Starts with b"SONY DSC \x00")
         elif raw_blob.startswith(b"SONY DSC \x00") or raw_blob.startswith(b"SONY MOBILE\x00"):
             hdr_len = 12
             sub_data = raw_blob[hdr_len:]
@@ -411,7 +398,6 @@ class ExifParser(BlockParser):
             }
             fields.extend(self._parse_sub_ifd(sub_data, 0, parent_endian, sony_tags, "Sony", maker_offset + hdr_len, block_abs_offset))
 
-        # 4. Canon (Starts directly with entry count)
         elif len(raw_blob) >= 4:
             canon_tags = {
                 0x0001: "CanonCameraSettings",

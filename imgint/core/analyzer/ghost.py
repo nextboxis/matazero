@@ -42,10 +42,8 @@ class JpegGhostDetector:
             else:
                 img = img_or_bytes.convert("RGB")
         except (OSError, ValueError, SyntaxError):
-            # Corrupt or truncated image — return empty result safely
             return _empty_result
 
-        # Resize if extremely large to prevent OOM
         max_dim = DEFAULT_MAX_ANALYSIS_DIM
         w, h = img.size
         if w == 0 or h == 0:
@@ -58,7 +56,6 @@ class JpegGhostDetector:
         orig_np = np.array(img, dtype=np.float32)
         height, width, _ = orig_np.shape
 
-        # Calculate error surface across quality factors
         error_surfaces: Dict[int, float] = {}
         pre_computed_errors: Dict[int, np.ndarray] = {}
 
@@ -68,13 +65,11 @@ class JpegGhostDetector:
             buf.seek(0)
             recompressed = np.array(Image.open(buf), dtype=np.float32)
 
-            # Mean absolute error
             diff = np.abs(orig_np - recompressed)
             pre_computed_errors[q] = diff
             mean_err = float(np.mean(diff))
             error_surfaces[q] = mean_err
 
-        # Detect local minimums in the error curve (JPEG Ghost signature)
         err_keys = list(error_surfaces.keys())
         err_vals = list(error_surfaces.values())
         local_mins = []
@@ -83,7 +78,6 @@ class JpegGhostDetector:
             if err_vals[i] < err_vals[i - 1] and err_vals[i] <= err_vals[i + 1]:
                 local_mins.append(err_keys[i])
 
-        # Estimated primary quality is the lowest local minimum if present, else absolute min
         if local_mins:
             min_error_q = local_mins[0]
             is_double_compressed = True
@@ -91,7 +85,6 @@ class JpegGhostDetector:
             min_error_q = min(error_surfaces, key=error_surfaces.get)
             is_double_compressed = False
 
-        # Compute 8x8 DCT grid boundary energy
         gray = np.mean(orig_np, axis=2)
         h_diff = np.abs(gray[1:, :] - gray[:-1, :])
 
@@ -103,7 +96,6 @@ class JpegGhostDetector:
         else:
             grid_contrast = float(h_8_energy / h_other_energy)
 
-        # Patch-wise local minimum variance for composite splicing detection
         step = block_size
         patch_best_q = []
         for y in range(0, height - step + 1, step):
@@ -115,7 +107,7 @@ class JpegGhostDetector:
                 patch_best_q.append(best_q)
 
         q_variance = float(np.var(patch_best_q)) if patch_best_q else 0.0
-        is_spliced = q_variance > SPLICING_VARIANCE_THRESHOLD  # Multi-modal quality distribution indicates composite image
+        is_spliced = q_variance > SPLICING_VARIANCE_THRESHOLD
 
         return {
             "is_double_compressed": is_double_compressed,

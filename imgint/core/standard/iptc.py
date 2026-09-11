@@ -42,16 +42,13 @@ class IptcParser(BlockParser):
         size = len(data)
         offset = 0
 
-        # Scan for 8BIM blocks
         while offset + 12 <= size:
-            # 8BIM signature
             sig = data[offset : offset + 4]
             if sig != b"8BIM":
                 offset += 1
                 continue
 
             resource_id = struct.unpack(">H", data[offset + 4 : offset + 6])[0]
-            # Resource name is a Pascal string (length byte + padded to even)
             name_len = data[offset + 6]
             name_total_len = (1 + name_len + 1) & ~1
             res_data_offset = offset + 6 + name_total_len
@@ -68,7 +65,6 @@ class IptcParser(BlockParser):
 
             res_data = data[res_payload_offset : res_payload_offset + res_size]
 
-            # Resource ID 0x0404 is IPTC-NAA record
             if resource_id == 0x0404:
                 self._parse_iptc_records(res_data, block.offset + res_payload_offset, fields, findings)
 
@@ -88,7 +84,7 @@ class IptcParser(BlockParser):
 
         while curr + 5 <= size:
             tag_marker = data[curr]
-            if tag_marker != 0x1C:  # IPTC tag marker
+            if tag_marker != 0x1C:
                 curr += 1
                 continue
 

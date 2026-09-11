@@ -19,13 +19,11 @@ class HtmlReportRenderer:
         file_name = html.escape(record.file_path.split("/")[-1].split("\\")[-1])
         sha_short = html.escape(record.sha256[:16] + "...")
 
-        # Extract Tier findings
         tiers: Dict[int, List[Finding]] = {i: [] for i in range(1, 8)}
         for f in record.findings:
             if 1 <= f.tier <= 7:
                 tiers[f.tier].append(f)
 
-        # Extract special signals for visual widgets
         solar_finding = next((f for f in record.findings if f.name in ("solar_position_expected", "solar_chronolocation_angles")), None)
         if solar_finding and isinstance(solar_finding.value, dict):
             solar_azimuth = float(solar_finding.value.get("solar_azimuth_degrees") or solar_finding.value.get("solar_azimuth_deg", 180.0))
@@ -64,7 +62,6 @@ class HtmlReportRenderer:
         attribution_finding = next((f for f in record.findings if f.name == "encoder_attribution"), None)
         attribution_text = attribution_finding.value if attribution_finding else "Insufficient reference data"
 
-        # Authenticity Verdict
         verdict = record.authenticity_verdict or {}
         auth = verdict.get("is_authentic")
         auth_label = (
@@ -85,7 +82,6 @@ class HtmlReportRenderer:
         if not reasons_list:
             reasons_list = "<li>Standard structural analysis completed without anomalies flagged.</li>"
 
-        # Generate Structural Units HTML rows
         units_rows = []
         for u in record.structural_units:
             units_rows.append(
@@ -98,7 +94,6 @@ class HtmlReportRenderer:
             )
         units_table_html = "\n".join(units_rows) if units_rows else "<tr><td colspan='4' class='text-dim text-center'>No container structural units recorded</td></tr>"
 
-        # Tier section cards
         tier_cards_html = []
         tier_names = {
             1: "Tier 1: Metadata Blocks & Tags",

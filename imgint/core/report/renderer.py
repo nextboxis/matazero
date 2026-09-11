@@ -170,7 +170,6 @@ class ReportRenderer:
         lines.append(f"Timestamp (UTC):  {record.timestamp_utc}")
         lines.append("-" * 80)
 
-        # Authenticity & Integrity Verdict Banner
         if record.authenticity_verdict:
             v = record.authenticity_verdict
             auth = v.get("is_authentic")
@@ -179,17 +178,27 @@ class ReportRenderer:
             lines.append(f"   Verdict Classification : {v.get('verdict_label')}")
             for r in v.get("supporting_reasons", []):
                 lines.append(f"   • {r}")
+            if v.get("corroborating_signals"):
+                lines.append("   [+] Corroborating Signals:")
+                for s in v["corroborating_signals"]:
+                    lines.append(f"       + {s}")
+            if v.get("contradicting_signals"):
+                lines.append("   [-] Contradicting Signals:")
+                for s in v["contradicting_signals"]:
+                    lines.append(f"       - {s}")
+            if v.get("inconclusive_signals"):
+                lines.append("   [?] Inconclusive Signals:")
+                for s in v["inconclusive_signals"]:
+                    lines.append(f"       ? {s}")
             lines.append("")
             lines.append("-" * 80)
 
-        # ADR-008 & FR-9.7: Lead with "What This Does NOT Establish"
         lines.append("\n[!] FORENSIC CAVEATS & CERTAINTY LIMITS:")
         lines.append(" • Verdicts are calculated from container consistency, hardware quantization, and C2PA claims.")
         lines.append(" • Absence of metadata is standard on social platforms and does not prove malicious manipulation.")
         lines.append(" • All derived and indicative findings carry confidence ratings and caveats detailed below.\n")
         lines.append("-" * 80)
 
-        # Group findings by Tier
         tiers: Dict[int, List[Finding]] = {i: [] for i in range(1, 8)}
         for f in record.findings:
             if 1 <= f.tier <= 7:
@@ -233,7 +242,6 @@ class ReportRenderer:
             lines.append(f"\n▶ {title}")
             lines.append("-" * 80)
 
-            # Special case for Tier 1: if there are extracted metadata fields, list a summary
             if t == 1 and record.fields:
                 lines.append(f" • Extracted Metadata Fields ({len(record.fields)} total):")
                 for fld in record.fields[:15]:

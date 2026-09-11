@@ -74,7 +74,6 @@ class OllamaVisionAnalyzer:
 
         response_text = res.get("response", "").strip()
         
-        # Strip markdown code fences if present
         if response_text.startswith("```json"):
             response_text = response_text[7:]
         elif response_text.startswith("```"):
@@ -86,7 +85,6 @@ class OllamaVisionAnalyzer:
         try:
             parsed_data = json.loads(response_text)
         except Exception:
-            # Fallback JSON extraction
             match = re.search(r'(\{.*\})', response_text, re.DOTALL)
             if match:
                 try:

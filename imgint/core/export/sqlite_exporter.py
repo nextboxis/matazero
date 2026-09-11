@@ -21,7 +21,6 @@ class SqliteExporter:
         conn = sqlite3.connect(str(p))
         cur = conn.cursor()
 
-        # Create Schema
         cur.executescript("""
             CREATE TABLE IF NOT EXISTS images (
                 sha256 TEXT PRIMARY KEY,
@@ -77,7 +76,6 @@ class SqliteExporter:
             risk = verdict_f.get("risk_level", "LOW")
             is_auth = 1 if verdict_f.get("is_authentic") is True else 0 if verdict_f.get("is_authentic") is False else None
 
-            # Insert Image
             cur.execute("""
                 INSERT OR REPLACE INTO images 
                 (sha256, file_name, file_path, mime_type, verdict_label, confidence_score, risk_level, is_authentic, imported_at)
@@ -94,7 +92,6 @@ class SqliteExporter:
                 now_iso,
             ))
 
-            # Insert Fields
             for fld in rec.fields:
                 cur.execute("""
                     INSERT INTO metadata_fields 
@@ -110,7 +107,6 @@ class SqliteExporter:
                     fld.offset,
                 ))
 
-            # Insert Findings
             for fnd in rec.findings:
                 cur.execute("""
                     INSERT INTO findings 
@@ -125,7 +121,6 @@ class SqliteExporter:
                     json.dumps(fnd.value) if isinstance(fnd.value, (dict, list)) else str(fnd.value),
                 ))
 
-            # Insert GPS
             gps_f = next((f for f in rec.findings if f.name == "gps_coordinates_claimed"), None)
             if gps_f and isinstance(gps_f.value, dict):
                 lat = gps_f.value.get("latitude")

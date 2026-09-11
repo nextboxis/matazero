@@ -20,9 +20,9 @@ class MetadataCleaner:
         Returns:
             (cleaned_bytes, original_size, cleaned_size)
         """
-        reader = BoundedReader(input_path)
-        detected = FormatDetector.detect(reader)
-        data = reader.get_all_bytes()
+        with BoundedReader(input_path) as reader:
+            detected = FormatDetector.detect(reader)
+            data = reader.get_all_bytes()
 
         if detected.format_name == "JPEG":
             cleaned = cls._clean_jpeg(data)
@@ -54,7 +54,6 @@ class MetadataCleaner:
         offset = 2
         size = len(data)
 
-        # Retain standard segments needed for rendering: DQT (0xDB), DHT (0xC4), SOF (0xC0..0xCF), SOS (0xDA), DRI (0xDD), APP0 (JFIF 0xE0)
         ALLOWED_MARKERS = {0xE0, 0xDB, 0xC4, 0xC0, 0xC1, 0xC2, 0xC3, 0xDD, 0xDA}
 
         while offset < size:
@@ -62,7 +61,6 @@ class MetadataCleaner:
                 offset += 1
                 continue
 
-            # Skip fill bytes
             while offset + 1 < size and data[offset + 1] == 0xFF:
                 offset += 1
 
@@ -70,11 +68,11 @@ class MetadataCleaner:
                 break
 
             marker = data[offset + 1]
-            if marker == 0xD9:  # EOI
+            if marker == 0xD9:
                 out.extend(b"\xFF\xD9")
                 break
 
-            if marker == 0xDA:  # SOS (Start of Scan) - rest is entropy data until EOI
+            if marker == 0xDA:
                 eoi_idx = data.find(b"\xFF\xD9", offset)
                 if eoi_idx != -1:
                     out.extend(data[offset : eoi_idx + 2])
@@ -105,7 +103,6 @@ class MetadataCleaner:
         offset = 8
         size = len(data)
 
-        # Critical chunks to preserve
         CRITICAL_CHUNKS = {b"IHDR", b"PLTE", b"IDAT", b"IEND", b"tRNS"}
 
         while offset + 8 <= size:
@@ -139,12 +136,10 @@ class MetadataCleaner:
         while offset + 8 <= size:
             chunk_fourcc = data[offset : offset + 4]
             chunk_len = struct.unpack("<I", data[offset + 4 : offset + 8])[0]
-            # WebP chunks are padded to even bytes
             padded_len = chunk_len + (chunk_len % 2)
             total_len = 8 + padded_len
 
             if offset + total_len > size:
-                # Include remaining payload if last chunk is truncated
                 if chunk_fourcc not in METADATA_CHUNKS:
                     out_chunks.extend(data[offset:])
                 break

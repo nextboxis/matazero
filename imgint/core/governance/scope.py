@@ -27,9 +27,9 @@ class AuthorizationScope:
     legal_basis: str
     authorising_party: str
     data_subject_categories: List[str]
-    permitted_operations: List[str]  # e.g., ["tier1", "tier2", "tier3", "tier4", "tier5", "tier6", "tier7"]
+    permitted_operations: List[str]
     retention_period_days: int
-    expiry_date: str  # ISO 8601 UTC string
+    expiry_date: str
     disabled_analyzers: List[str] = field(default_factory=list)
     signature: Optional[str] = None
     scope_hash: Optional[str] = None
@@ -37,7 +37,6 @@ class AuthorizationScope:
 
     def __post_init__(self) -> None:
         if not self.is_self_audit:
-            # Check for refused capabilities
             enforce_refusals(set(self.permitted_operations))
 
     @property
@@ -56,7 +55,6 @@ class AuthorizationScope:
 
     def is_analyzer_permitted(self, analyzer_id: str, tier: int) -> bool:
         if self.is_self_audit:
-            # Self-audit allows privacy examination (tiers 1-4)
             return analyzer_id not in self.disabled_analyzers
 
         if analyzer_id in self.disabled_analyzers:
@@ -121,7 +119,6 @@ class AuthorizationScope:
         except Exception as e:
             raise ScopeValidationError(f"Failed to read scope JSON: {e}")
 
-        # Required fields check per GR-1.2
         required = [
             "case_id", "purpose", "legal_basis", "authorising_party",
             "data_subject_categories", "permitted_operations",
@@ -146,7 +143,6 @@ class AuthorizationScope:
             is_self_audit=data.get("is_self_audit", False),
         )
 
-        # Verify integrity
         expected_hash = scope.compute_canonical_hash()
         if scope.scope_hash and scope.scope_hash != expected_hash:
             raise ScopeValidationError("Scope integrity check failed: scope_hash does not match content.")
@@ -156,7 +152,6 @@ class AuthorizationScope:
             if scope.signature != expected_sig:
                 raise ScopeValidationError("Scope signature verification failed: invalid signature.")
 
-        # Check expiry per GR-1.3
         if scope.is_expired:
             raise ScopeValidationError(
                 f"Authorization scope expired on {scope.expiry_date}. "

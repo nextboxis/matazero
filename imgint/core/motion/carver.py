@@ -1,4 +1,4 @@
-﻿"""Carver for extracting embedded motion video streams."""
+"""Carver for extracting embedded motion video streams."""
 
 from __future__ import annotations
 from pathlib import Path
@@ -24,8 +24,8 @@ class MotionPhotoCarver:
         if not info.is_motion_photo or info.video_offset is None or info.video_size_bytes is None:
             return info
 
-        reader = BoundedReader(p)
-        video_bytes = reader.read_bytes(info.video_offset, info.video_size_bytes)
+        with BoundedReader(p) as reader:
+            video_bytes = reader.read_bytes(info.video_offset, info.video_size_bytes)
 
         if output_file:
             dest_path = Path(output_file)

@@ -53,9 +53,9 @@ class SQLiteGeocodeResult:
 @dataclass
 class FacilityMatch:
     """Proximity match to an airport, seaport, or transit hub."""
-    facility_type: str  # 'airport' | 'port'
+    facility_type: str
     name: str
-    code: str  # IATA/ICAO code or identifier
+    code: str
     category: str
     lat: float
     lon: float
@@ -95,11 +95,9 @@ def decode_wkb_point(geom_bytes: Optional[bytes]) -> Tuple[Optional[float], Opti
     if not geom_bytes or len(geom_bytes) < 21:
         return None, None
     try:
-        # Little-endian (byte 0 == 1)
         if geom_bytes[0] == 1 and geom_bytes[1:5] == b'\x01\x00\x00\x00':
             lon, lat = struct.unpack('<dd', geom_bytes[5:21])
             return lat, lon
-        # Big-endian (byte 0 == 0)
         elif geom_bytes[0] == 0 and geom_bytes[1:5] == b'\x00\x00\x00\x01':
             lon, lat = struct.unpack('>dd', geom_bytes[5:21])
             return lat, lon
@@ -150,8 +148,7 @@ class NaturalEarthDB:
         if env_path and os.path.exists(env_path):
             return env_path
 
-        # Check default paths
-        base_dir = Path(__file__).resolve().parents[4]  # repo root (j:\PROGRAM\mata)
+        base_dir = Path(__file__).resolve().parents[4]
         for rel in cls.DEFAULT_PATHS:
             p = Path(rel)
             if p.is_absolute() and p.exists():
@@ -180,7 +177,6 @@ class NaturalEarthDB:
         if not self.is_available or self._conn is None:
             return None
 
-        # Search windows (in degrees): 1.0 deg (~111km), 3.0 deg (~333km), 10.0 deg (~1110km)
         windows = [1.0, 3.0, 10.0, 45.0]
         cursor = self._conn.cursor()
 
@@ -209,7 +205,6 @@ class NaturalEarthDB:
                         cc = (iso_a2 or "").strip().upper()
                         best_match = (c_name, country, cc, admin1, p_lat, p_lon, tz or "UTC", int(pop or 0), fclass or "city", min_dist)
                 
-                # If we found matches within this window and distance is reasonable, break early
                 if min_dist <= max_distance_km:
                     break
 
@@ -257,7 +252,6 @@ class NaturalEarthDB:
             return None
 
         cursor = self._conn.cursor()
-        # Search radius window (~1.0 degree ~= 111 km)
         cursor.execute('''
             SELECT name, name_en, iata_code, gps_code, type, GEOMETRY
             FROM "ne_10m_airports"

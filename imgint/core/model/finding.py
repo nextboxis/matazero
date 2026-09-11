@@ -15,8 +15,8 @@ class Confidence(str, Enum):
 
 @dataclass
 class Provenance:
-    source_layer: str  # e.g., "container", "standard", "fingerprint", "artefact", "analyzer"
-    extractor: str     # e.g., "jpeg_dqt", "exif_gps", "offline_geocoder"
+    source_layer: str
+    extractor: str
     offset: Optional[int] = None
     length: Optional[int] = None
     standard: Optional[str] = None
@@ -51,7 +51,6 @@ class Finding:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        # Enforce ADR-008: Confidence and caveat as required fields
         if not isinstance(self.confidence, Confidence):
             if isinstance(self.confidence, str):
                 try:

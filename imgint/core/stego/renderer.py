@@ -20,7 +20,6 @@ class StegoRenderer:
     def render_terminal(cls, result: StegoAnalysisResult, console: Console) -> None:
         file_name = Path(result.target_file).name
 
-        # Header Panel
         v_color = "green" if result.risk_level == "LOW" else "yellow" if result.risk_level == "MEDIUM" else "bold red"
         panel_content = Text()
         panel_content.append(f"Target Evidence:  ", style="dim")
@@ -37,7 +36,6 @@ class StegoRenderer:
 
         console.print(Panel(panel_content, title="[bold]matazero Deep Steganography & Bitplane Inspector[/bold]", border_style="cyan"))
 
-        # Bitplane Entropy Grid Table
         bp_table = Table(title="Bitplane Slicing Entropy Grid (H: 0.00 to 1.00)", show_header=True)
         bp_table.add_column("Bitplane", style="bold cyan")
         bp_table.add_column("Description", style="dim")
@@ -73,7 +71,6 @@ class StegoRenderer:
         console.print(bp_table)
         console.print("")
 
-        # Chi-Square PoV Table
         chi_table = Table(title="Chi-Square (PoV) Pair-of-Values Statistical Test", show_header=True)
         chi_table.add_column("Color Channel", style="bold")
         chi_table.add_column("Chi-Square Stat (χ²)", justify="right", style="cyan")

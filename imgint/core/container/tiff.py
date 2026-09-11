@@ -61,7 +61,6 @@ class TiffContainerReader(ContainerReader):
             )
         )
 
-        # Emit full TIFF block as EXIF metadata
         blocks.append(
             MetadataBlock(
                 kind="EXIF",
@@ -72,7 +71,6 @@ class TiffContainerReader(ContainerReader):
             )
         )
 
-        # Walk IFD chain
         ifd_offset = first_ifd_offset
         ifd_index = 0
         visited_ifds = set()
@@ -108,7 +106,6 @@ class TiffContainerReader(ContainerReader):
                 )
             )
 
-            # Next IFD pointer is 4 bytes at the end of the entries table
             next_ptr_offset = ifd_offset + 2 + entry_count * 12
             if next_ptr_offset + 4 <= size:
                 ifd_offset = struct.unpack(f"{endian}I", reader.read_bytes(next_ptr_offset, 4))[0]

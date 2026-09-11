@@ -33,7 +33,6 @@ class DiagnosticRunner:
             "checks": [],
         }
 
-        # 1. Python Environment
         py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
         py_ok = sys.version_info >= MIN_PYTHON_VERSION
         arch = platform.machine()
@@ -48,7 +47,6 @@ class DiagnosticRunner:
         if not py_ok:
             results["all_passed"] = False
 
-        # 2. Forensic Dependencies
         required_libs = [
             ("PIL", "Pillow (Image Processing)"),
             ("numpy", "NumPy (Matrix Math)"),
@@ -75,9 +73,7 @@ class DiagnosticRunner:
         if not deps_ok:
             results["all_passed"] = False
 
-        # 3. Sandboxed Worker Isolation Test
         try:
-            # Create a 1x1 test image
             from PIL import Image
             import io
             import base64
@@ -102,7 +98,6 @@ class DiagnosticRunner:
         if not sandbox_ok:
             results["all_passed"] = False
 
-        # 4. Local Ollama AI Vision Service
         ollama = OllamaClient()
         ollama_online = ollama.is_available()
         if ollama_online:
@@ -126,7 +121,6 @@ class DiagnosticRunner:
             "optional": True,
         })
 
-        # 5. Evidence Vault Storage & Permissions
         vault_path = Path(DEFAULT_VAULT_PATH).resolve()
         try:
             vault_path.mkdir(parents=True, exist_ok=True)
@@ -154,7 +148,6 @@ class DiagnosticRunner:
         if not storage_ok:
             results["all_passed"] = False
 
-        # 6. Man Page & CLI Access
         if platform.system() != "Windows":
             man_path = Path("/usr/local/share/man/man1/matazero.1")
             has_man = man_path.exists() or Path("docs/man/matazero.1").exists()
@@ -167,7 +160,6 @@ class DiagnosticRunner:
                 "optional": True,
             })
 
-        # Render Rich UI Output
         cls._render_ui(results, console)
         return results
 

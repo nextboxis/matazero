@@ -63,11 +63,10 @@ def resolve_scope(
     return AuthorizationScope.create_self_audit_scope()
 
 
-# Standard image file extensions for evidence discovery
 IMAGE_EXTENSIONS = {
-    ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".webp",
-    ".heic", ".heif", ".avif", ".bmp", ".gif",
-    ".docx", ".pptx",
+    ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tiff", ".tif",
+    ".cr2", ".nef", ".arw", ".dng", ".jxl", ".avif", ".bmp", ".gif",
+    ".pptx", ".ppsx", ".docx", ".xlsx", ".zip", ".odp", ".psd", ".svg",
 }
 
 

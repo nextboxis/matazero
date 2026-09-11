@@ -52,7 +52,6 @@ class CaseDossierGenerator:
                 badge_class = "badge-unverified"
                 badge_text = "Stripped / Inconclusive"
 
-            # Check GPS from verified findings
             gps_f = next((f for f in rec.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
             time_f = next((f for f in rec.fields if "DateTime" in f.name), None)
             make_f = next((f for f in rec.fields if f.name == "Make"), None)
@@ -70,7 +69,6 @@ class CaseDossierGenerator:
                     try:
                         fl_lat = float(raw_lat)
                         fl_lon = float(raw_lon)
-                        # Sanitize: bounds and Null Island check
                         if -90.0 <= fl_lat <= 90.0 and -180.0 <= fl_lon <= 180.0:
                             if not (abs(fl_lat) < 0.0001 and abs(fl_lon) < 0.0001):
                                 lat_val = fl_lat
@@ -91,7 +89,6 @@ class CaseDossierGenerator:
                     "verdict": safe_badge_text,
                 })
 
-            # Format finding tags
             finding_names = [html.escape(f.name) for f in rec.findings[:6]]
 
             table_rows_data.append({
@@ -121,7 +118,6 @@ class CaseDossierGenerator:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{safe_case_title} — matazero</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
 :root {{
   --bg-primary: #0f172a;
@@ -153,7 +149,10 @@ header {{ display: flex; justify-content: space-between; align-items: center; bo
 .val-yellow {{ color: var(--accent-yellow); }}
 .section-title {{ font-size: 18px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary); }}
 #map-container {{ background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }}
-#map {{ height: 400px; width: 100%; }}
+.map-header {{ display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color); }}
+.map-canvas-wrap {{ position: relative; width: 100%; height: 380px; background: #0b1120; }}
+#geoCanvas {{ width: 100%; height: 100%; display: block; }}
+.map-tooltip {{ position: absolute; display: none; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--accent-cyan); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #f8fafc; pointer-events: none; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }}
 .table-card {{ background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; padding: 16px; }}
 .table-header-bar {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 16px; }}
 .search-input {{ background: #0f172a; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 16px; color: var(--text-primary); font-size: 14px; width: 300px; }}
@@ -179,7 +178,7 @@ footer {{ text-align: center; color: var(--text-secondary); font-size: 12px; mar
       <div class="subtitle">{safe_case_title} • Generated on {generated_at}</div>
     </div>
     <div style="text-align: right;">
-      <span class="badge badge-authentic">Air-Gapped Forensic Audit</span>
+      <span class="badge badge-authentic">100% Offline Air-Gapped Safe</span>
     </div>
   </header>
 
@@ -207,8 +206,14 @@ footer {{ text-align: center; color: var(--text-secondary); font-size: 12px; mar
   </div>
 
   <div id="map-container" style="display: {'block' if gps_points else 'none'};">
-    <div style="padding: 12px 16px; font-weight: 600; border-bottom: 1px solid var(--border-color);">🗺️ Evidence Geolocation Map</div>
-    <div id="map"></div>
+    <div class="map-header">
+      <div style="font-weight: 600;">🗺️ Air-Gapped Geolocation Map Grid</div>
+      <span style="font-size: 12px; color: var(--accent-cyan);">Zero External Telemetry</span>
+    </div>
+    <div class="map-canvas-wrap">
+      <canvas id="geoCanvas"></canvas>
+      <div id="mapTooltip" class="map-tooltip"></div>
+    </div>
   </div>
 
   <div class="table-card">
@@ -248,31 +253,128 @@ footer {{ text-align: center; color: var(--text-secondary); font-size: 12px; mar
   </div>
 
   <footer>
-    matazero v2.0.0 — Courtroom-grade digital image forensics and ethical OSINT.<br>
+    matazero — Courtroom-grade digital image forensics and ethical OSINT.<br>
     SHA-256 Custody Hash Verified. 100% Offline & Air-Gapped.
   </footer>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const gpsData = {gps_json};
 
-if (gpsData.length > 0) {{
-  const map = L.map('map').setView([gpsData[0].lat, gpsData[0].lng], 13);
-  L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-  }}).addTo(map);
+function renderAirGappedMap() {{
+  const canvas = document.getElementById('geoCanvas');
+  if (!canvas || gpsData.length === 0) return;
+  const ctx = canvas.getContext('2d');
+  const tooltip = document.getElementById('mapTooltip');
 
-  const bounds = [];
-  gpsData.forEach(p => {{
-    const marker = L.marker([p.lat, p.lng]).addTo(map);
-    marker.bindPopup(`<b>${{p.file_name}}</b><br>Camera: ${{p.camera}}<br>Time: ${{p.timestamp}}<br>Verdict: ${{p.verdict}}`);
-    bounds.push([p.lat, p.lng]);
-  }});
-  if (bounds.length > 1) {{
-    map.fitBounds(bounds, {{ padding: [30, 30] }});
+  function resize() {{
+    canvas.width = canvas.parentElement.clientWidth * window.devicePixelRatio;
+    canvas.height = canvas.parentElement.clientHeight * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    draw();
   }}
+
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+  gpsData.forEach(p => {{
+    if (p.lat < minLat) minLat = p.lat;
+    if (p.lat > maxLat) maxLat = p.lat;
+    if (p.lng < minLng) minLng = p.lng;
+    if (p.lng > maxLng) maxLng = p.lng;
+  }});
+
+  const padLat = Math.max(0.05, (maxLat - minLat) * 0.2);
+  const padLng = Math.max(0.05, (maxLng - minLng) * 0.2);
+  minLat -= padLat; maxLat += padLat;
+  minLng -= padLng; maxLng += padLng;
+
+  function toScreen(lat, lng) {{
+    const w = canvas.parentElement.clientWidth;
+    const h = canvas.parentElement.clientHeight;
+    const x = ((lng - minLng) / (maxLng - minLng)) * (w - 80) + 40;
+    const y = ((maxLat - lat) / (maxLat - minLat)) * (h - 60) + 30;
+    return {{ x, y }};
+  }}
+
+  function draw() {{
+    const w = canvas.parentElement.clientWidth;
+    const h = canvas.parentElement.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    // Draw grid lines
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+    for (let x = 40; x < w; x += 60) {{
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }}
+    for (let y = 30; y < h; y += 50) {{
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }}
+
+    // Draw coordinate markers
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px monospace';
+    ctx.fillText(`${{maxLat.toFixed(2)}}°N`, 6, 20);
+    ctx.fillText(`${{minLat.toFixed(2)}}°S`, 6, h - 10);
+    ctx.fillText(`${{minLng.toFixed(2)}}°W`, 40, h - 8);
+    ctx.fillText(`${{maxLng.toFixed(2)}}°E`, w - 70, h - 8);
+
+    // Plot evidence locations
+    gpsData.forEach((p, idx) => {{
+      const pos = toScreen(p.lat, p.lng);
+
+      // Radar glow pulse
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 14, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(6, 182, 212, 0.15)';
+      ctx.fill();
+
+      // Outer ring
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Center pin
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fill();
+
+      // Label
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '11px sans-serif';
+      ctx.fillText(p.file_name, pos.x + 12, pos.y + 4);
+    }});
+  }}
+
+  canvas.addEventListener('mousemove', (e) => {{
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    let hit = null;
+
+    gpsData.forEach(p => {{
+      const pos = toScreen(p.lat, p.lng);
+      const dist = Math.hypot(mx - pos.x, my - pos.y);
+      if (dist <= 16) hit = {{ p, pos }};
+    }});
+
+    if (hit) {{
+      tooltip.style.display = 'block';
+      tooltip.style.left = `${{hit.pos.x + 16}}px`;
+      tooltip.style.top = `${{hit.pos.y - 10}}px`;
+      tooltip.innerHTML = `<b>${{hit.p.file_name}}</b><br>Coordinates: ${{hit.p.lat.toFixed(5)}}, ${{hit.p.lng.toFixed(5)}}<br>Camera: ${{hit.p.camera}}<br>Timestamp: ${{hit.p.timestamp}}<br>Verdict: ${{hit.p.verdict}}`;
+    }} else {{
+      tooltip.style.display = 'none';
+    }}
+  }});
+
+  window.addEventListener('resize', resize);
+  resize();
 }}
+
+renderAirGappedMap();
 
 function filterTable() {{
   const input = document.getElementById('searchInput');

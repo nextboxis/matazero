@@ -40,7 +40,6 @@ class SandboxRunner:
             payload.update(kwargs)
         input_json = json.dumps(payload)
 
-        # Ensure child process can always locate imgint package
         repo_root = str(Path(__file__).parent.parent.parent.parent.resolve())
         env = os.environ.copy()
         existing_pythonpath = env.get("PYTHONPATH", "")

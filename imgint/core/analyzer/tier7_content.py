@@ -52,7 +52,6 @@ class ContentAnalyzer(Analyzer):
 
         tasks = sandbox_res.get("tasks", {})
 
-        # FR-8.4: Dimensions and aspect ratio
         if "dimensions" in tasks:
             dims = tasks["dimensions"]
             findings.append(
@@ -67,7 +66,6 @@ class ContentAnalyzer(Analyzer):
                 )
             )
 
-        # FR-8.4: Dominant colors
         if "dominant_colors" in tasks:
             colors = tasks["dominant_colors"]
             findings.append(
@@ -82,7 +80,6 @@ class ContentAnalyzer(Analyzer):
                 )
             )
 
-        # FR-8.3: LSB Entropy screening
         if "entropy" in tasks:
             entropy_data = tasks["entropy"]
             findings.append(
@@ -100,7 +97,6 @@ class ContentAnalyzer(Analyzer):
                 )
             )
 
-        # 2D FFT Frequency & Synthetic Grid Anomaly Screening
         if "fft_frequency" in tasks:
             fft_data = tasks["fft_frequency"]
             findings.append(
@@ -118,7 +114,6 @@ class ContentAnalyzer(Analyzer):
                 )
             )
 
-        # JPEG Ghost & Double Compression Splicing Analysis
         if "ghost" in tasks:
             ghost_data = tasks["ghost"]
             findings.append(
@@ -136,7 +131,6 @@ class ContentAnalyzer(Analyzer):
                 )
             )
 
-        # CFA (Color Filter Array) Bayer Demosaicing Inconsistency Analysis
         if "cfa" in tasks:
             cfa_data = tasks["cfa"]
             is_hw = cfa_data.get("is_hardware_sensor_consistent", False)
@@ -155,7 +149,6 @@ class ContentAnalyzer(Analyzer):
                 )
             )
 
-        # Copy-Move & Clone-Stamp Forgery Detection
         if "copymove" in tasks:
             copymove_data = tasks["copymove"]
             is_cloned = copymove_data.get("copy_move_detected", False)

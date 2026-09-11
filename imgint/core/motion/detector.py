@@ -15,7 +15,7 @@ class MotionPhotoInfo:
     file_name: str
     file_path: str
     is_motion_photo: bool
-    motion_type: str  # "SAMSUNG_MOTION_PHOTO", "GOOGLE_PIXEL_MICROVIDEO", "GENERIC_EMBEDDED_MP4", "APPLE_LIVE_PHOTO_TRACK", "NONE"
+    motion_type: str
     video_offset: Optional[int] = None
     video_size_bytes: Optional[int] = None
     presentation_timestamp_us: Optional[int] = None
@@ -36,7 +36,6 @@ class MotionPhotoDetector:
         reader = BoundedReader(p)
         total_size = reader.size
 
-        # Default info
         info = MotionPhotoInfo(
             file_name=p.name,
             file_path=str(p),
@@ -45,18 +44,16 @@ class MotionPhotoDetector:
         )
 
         if total_size < 32:
+            reader.close()
             return info
 
-        # Read first 1MB and last 2MB for signatures
         header_sample = reader.read_bytes(0, min(total_size, 512 * 1024))
         trailer_sample_len = min(total_size, 1024 * 1024)
         trailer_offset = total_size - trailer_sample_len
         trailer_sample = reader.read_bytes(trailer_offset, trailer_sample_len)
 
-        # 1. Check for XMP GCamera:MicroVideo / MotionPhoto attributes in header/full
         all_text = (header_sample + trailer_sample).decode("latin-1", errors="ignore")
 
-        # Regex search for XMP MicroVideo attributes
         is_mv = re.search(r'GCamera:MicroVideo\s*=\s*["\']?1["\']?', all_text, re.IGNORECASE) or \
                 re.search(r'MotionPhoto\s*=\s*["\']?1["\']?', all_text, re.IGNORECASE)
         
@@ -76,12 +73,10 @@ class MotionPhotoDetector:
             xmp_attrs["PresentationTimestampUs"] = pts_match.group(1)
             info.presentation_timestamp_us = int(pts_match.group(1))
 
-        # If XMP offset is specified (offset from EOF)
         if offset_match:
             mv_offset_from_eof = int(offset_match.group(1))
             if 0 < mv_offset_from_eof < total_size:
                 vid_start = total_size - mv_offset_from_eof
-                # Verify MP4 magic at vid_start
                 if vid_start + 8 <= total_size:
                     box_tag = reader.read_bytes(vid_start + 4, 4)
                     if box_tag == b"ftyp":
@@ -92,10 +87,9 @@ class MotionPhotoDetector:
                         info.video_size_bytes = mv_offset_from_eof
                         info.video_codec_brand = brand
                         info.xmp_attributes = xmp_attrs
+                        reader.close()
                         return info
 
-        # 2. Binary Scan for embedded 'ftyp' MP4 box beyond JPEG header
-        # Scan full bytes for 'ftyp'
         raw_bytes = reader.get_all_bytes()
         ftyp_idx = 0
         while True:
@@ -114,7 +108,9 @@ class MotionPhotoDetector:
                         info.video_size_bytes = total_size - box_start
                         info.video_codec_brand = brand
                         info.xmp_attributes = xmp_attrs
+                        reader.close()
                         return info
             ftyp_idx = ftyp_pos + 4
 
+        reader.close()
         return info

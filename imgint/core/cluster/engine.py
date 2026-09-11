@@ -35,7 +35,7 @@ class ClusteredItem:
 class EvidenceCluster:
     cluster_id: str
     cluster_label: str
-    strategy: str  # "camera", "dqt", "geo", "visual"
+    strategy: str
     item_count: int
     items: List[ClusteredItem] = field(default_factory=list)
 
@@ -103,7 +103,6 @@ class ClusterEngine:
         else:
             clusters = cls._cluster_by_camera(items)
 
-        # Detect Outliers (clusters with only 1 item while a major cluster exists)
         outliers: List[ClusteredItem] = []
         if len(clusters) > 1:
             main_cluster_size = max(c.item_count for c in clusters)
@@ -129,14 +128,12 @@ class ClusterEngine:
         model = str(f_map.get("Model")) if f_map.get("Model") else None
         serial = str(f_map.get("BodySerialNumber") or f_map.get("SerialNumber") or "")
 
-        # DQT Hash
         dqt_bytes = bytearray()
         for u in rec.structural_units:
             if u.name == "DQT" and u.payload:
                 dqt_bytes.extend(u.payload)
         dqt_hash = hashlib.md5(dqt_bytes).hexdigest()[:8] if dqt_bytes else "no_dqt"
 
-        # GPS (Sanitized against bounds and Null Island)
         coords = None
         gps_finding = next((f for f in rec.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
         if gps_finding and isinstance(gps_finding.value, dict):
@@ -151,7 +148,6 @@ class ClusterEngine:
                 except Exception:
                     pass
 
-        # Perceptual hash
         phash_f = next((f.value for f in rec.findings if f.name == "perceptual_hashes" and isinstance(f.value, dict)), {})
         phash = phash_f.get("phash") or phash_f.get("ahash")
 
@@ -236,7 +232,6 @@ class ClusterEngine:
                 if j in visited:
                     continue
                 lat2, lon2 = other.gps_coordinates
-                # Haversine distance
                 dlat = math.radians(lat2 - lat1)
                 dlon = math.radians(lon2 - lon1)
                 a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
@@ -290,7 +285,7 @@ class ClusterEngine:
                         continue
                     val2 = int(other.phash, 16)
                     h_dist = bin(val1 ^ val2).count("1")
-                    if h_dist <= 5:  # Near visual duplicate
+                    if h_dist <= 5:
                         visited.add(j)
                         group.append(other)
 

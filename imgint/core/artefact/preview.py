@@ -10,8 +10,7 @@ class PreviewExtractor:
 
     @staticmethod
     def extract_preview(data: bytes) -> Optional[bytes]:
-        # Search for embedded JPEG stream (FF D8 FF)
-        soi_idx = data.find(b"\xFF\xD8\xFF", 8)  # Skip beginning if main file is JPEG
+        soi_idx = data.find(b"\xFF\xD8\xFF", 8)
         if soi_idx != -1:
             eoi_idx = data.find(b"\xFF\xD9", soi_idx)
             if eoi_idx != -1:

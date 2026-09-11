@@ -28,7 +28,6 @@ class IndicatorsAnalyzer(Analyzer):
         findings: List[Finding] = []
         diagnostics: List[Diagnostic] = []
 
-        # FR-7.9: Absence of metadata must be reported as normal platform distribution, never as tampering
         if not ctx.metadata_blocks:
             findings.append(
                 Finding(
@@ -42,7 +41,6 @@ class IndicatorsAnalyzer(Analyzer):
                 )
             )
 
-        # FR-7.4: Metadata timeline contradiction check
         dt_orig_str = ctx.get_field_value("DateTimeOriginal")
         dt_mod_str = ctx.get_field_value("ModifyDate") or ctx.get_field_value("DateTime")
 
@@ -72,7 +70,6 @@ class IndicatorsAnalyzer(Analyzer):
                         )
                     )
 
-        # FR-7.5: Thumbnail / Main divergence check
         thumb_finding = ctx.get_finding("exif_thumbnail_extracted")
         if thumb_finding:
             findings.append(
@@ -87,7 +84,6 @@ class IndicatorsAnalyzer(Analyzer):
                 )
             )
 
-        # FR-7.7: Error Level Analysis (ELA) strictly behind opt-in flag
         if ctx.enable_ela:
             sandbox_res = SandboxRunner.run_decode_tasks(ctx.file_path, tasks=["ela"])
             if sandbox_res.get("success") and "tasks" in sandbox_res:
@@ -114,14 +110,12 @@ class IndicatorsAnalyzer(Analyzer):
         s = s.strip()
         if not s:
             return None
-        # 1. Try ISO 8601 first to preserve timezone and subsecond precision
         try:
             iso_s = s.replace("Z", "+00:00") if s.endswith("Z") else s
             return datetime.fromisoformat(iso_s)
         except Exception:
             pass
 
-        # 2. Fallback to EXIF and standard datetime formats
         clean = s.split(".")[0]
         for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
             try:

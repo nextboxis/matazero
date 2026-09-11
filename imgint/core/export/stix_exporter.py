@@ -23,7 +23,6 @@ class StixExporter:
             file_id = f"file--{uuid.uuid4()}"
             file_name = Path(rec.file_path).name
 
-            # 1. File SCO
             file_sco = {
                 "type": "file",
                 "spec_version": "2.1",
@@ -36,7 +35,6 @@ class StixExporter:
             }
             objects.append(file_sco)
 
-            # 2. Check for high risk indicators (Trailing payloads, Stego, Synthetic)
             verdict_f = next((f.value for f in rec.findings if f.name == "authenticity_verdict" and isinstance(f.value, dict)), {})
             risk = verdict_f.get("risk_level", "LOW")
             reasons = verdict_f.get("supporting_reasons", [])
@@ -60,7 +58,6 @@ class StixExporter:
                 }
                 objects.append(indicator_sdo)
 
-                # Relationship SDO
                 rel_sdo = {
                     "type": "relationship",
                     "spec_version": "2.1",
