@@ -1,5 +1,5 @@
 .\" Manpage for matazero
-.TH MATAZERO 1 "August 2026" "matazero 2.0.0" "User Commands"
+.TH MATAZERO 1 "September 2026" "matazero 2.1.0" "User Commands"
 .SH NAME
 matazero \- Image Intelligence Toolkit for Ethical OSINT and Digital Forensics
 
@@ -15,7 +15,7 @@ matazero \- Image Intelligence Toolkit for Ethical OSINT and Digital Forensics
 
 .SH DESCRIPTION
 .B matazero
-is a courtroom-grade, offline-first digital image forensics and ethical open-source intelligence (OSINT) analysis suite. It implements a 7-tier extraction pipeline to inspect image container structures, hardware encoder quantization tables (DQT/DHT), embedded payloads, chronological timelines, spatial reverse-geocoding, steganography, JPEG ghost slicing, CFA Bayer demosaicing artifacts, copy-move cloning, and local Ollama-based AI vision examination.
+is a courtroom-grade, offline-first digital image forensics and ethical open-source intelligence (OSINT) analysis suite. It implements a 7-tier extraction pipeline to inspect image container structures, hardware encoder quantization tables (DQT/DHT), embedded payloads, chronological timelines, spatial reverse-geocoding, steganography, JPEG ghost slicing, CFA Bayer demosaicing artifacts, copy-move cloning, local Ollama-based AI vision examination, and cryptographic evidence scrambling, decryption, and authenticated container encapsulation.
 
 The tool operates strictly air-gapped with zero telemetry and contains hardcoded refusal logic against biometric facial recognition and bulk scraping.
 
@@ -30,6 +30,12 @@ Smart 1-command evidence auto-triage with live progress bars and interactive HTM
 .B analyze \fITARGETS...\fR
 Run 7 forensic extraction tiers over image files or directories.
 .TP
+.B decrypt \fITARGET\fR [\fIOPTIONS\fR]
+Forensic image decryption, de-scrambling, and dictionary passkey recovery. Restores rasters encrypted with PRNG stream ciphers (Mulberry32), chaotic phase permutations (Arnold Cat Map), or authenticated AES-256-GCM containers (.mataenc). Supports direct 32-bit seed restoration and automated entropy-guided dictionary cracking.
+.TP
+.B encrypt \fITARGET\fR [\fIOPTIONS\fR]
+Encrypt or scramble image rasters using PRNG/chaotic ciphers (Mulberry32, Arnold Cat Map) or package complete evidence files into tamper-evident authenticated containers (.mataenc) using AES-256-GCM.
+.TP
 .B ask \fITARGET QUESTION\fR
 Interrogate an evidence image using your local Ollama vision model (100% offline).
 .TP
@@ -39,8 +45,8 @@ Discover and inspect local vision models available in your Ollama daemon.
 .B diff \fIIMAGE1 IMAGE2\fR
 Forensic comparison between two images (structural units, metadata delta, DQT tables, and pixel SSIM).
 .TP
-.B stego \fITARGET\fR
-Deep steganography analysis, multi-channel bitplane slicing (planes 0-7), and Chi-Square Pair-of-Values test.
+.B stego \fITARGET\fR [\fIOPTIONS\fR]
+Deep steganography analysis, multi-channel bitplane slicing (planes 0-7), Chi-Square Pair-of-Values test, and AES-GCM encrypted LSB/trailing payload injection and extraction.
 .TP
 .B timeline \fITARGETS...\fR
 Reconstruct chronological timelines across multiple files with camera clock drift estimation and Plaso/Timesketch export.
@@ -103,6 +109,33 @@ Number of concurrent worker threads (default: 1).
 .TP
 .BR \-c ", " \-\-carve
 Automatically carve trailing archives, payloads, and embedded video streams.
+.TP
+.BR \-p ", " \-\-password " \fIPASSWORD\fR"
+Passphrase or secret key used for image encryption, decryption, container packaging, or steganographic payload protection.
+.TP
+.BR \-m ", " \-\-method " \fIMETHOD\fR"
+Cipher algorithm: \fBmulberry32\fR (default PRNG stream cipher), \fBchaos\fR (Arnold Cat Map), \fBaes-256-gcm\fR, \fBaes-256-cbc\fR, or \fBauto\fR.
+.TP
+.BR \-\-container
+Package the target file into a tamper-evident, authenticated AES-256-GCM forensic container (.mataenc).
+.TP
+.BR \-\-seed " \fISEED\fR"
+Direct 32-bit PRNG seed value in decimal or hexadecimal format (e.g. \fB1260129352\fR or \fB0x4b1c0c48\fR) for deterministic raster recovery.
+.TP
+.BR \-\-brute\-force
+Perform automated entropy-guided dictionary cracking and candidate password recovery when passkey is unknown.
+.TP
+.BR \-w ", " \-\-wordlist " \fIPATH\fR"
+Wordlist file path for dictionary-based passkey recovery.
+.TP
+.BR \-\-inject " \fITEXT\fR"
+Embed a hidden text message into image RGB least-significant bitplanes with optional AES-GCM encryption.
+.TP
+.BR \-\-extract
+Extract hidden LSB or trailing carrier payload from target image.
+.TP
+.BR \-\-save\-bitplanes " \fIDIR\fR"
+Export extracted bitplane slices (planes 0 through 7 across R, G, B channels) to the specified directory as PNG images.
 .TP
 .BR \-\-ollama " \fIMODEL\fR"
 Enable local Ollama vision model inspection in Tier 7 (e.g. \fBllama3.2-vision\fR, \fBmoondream\fR).
@@ -184,6 +217,30 @@ matazero export ./case_evidence \-a \-r \-t sqlite \-o case.db
 .TP
 .B 7. Reconstruct case timeline and estimate camera clock drift:
 matazero timeline ./case_photos \-a \-r \-f plaso \-o timeline.jsonl
+.TP
+.B 8. Encrypt image rasters with Mulberry32 PRNG stream cipher:
+matazero encrypt IMG20260901143431.jpg \-p "Case#2026-Secret" \-m mulberry32 \-o encrypted-IMG20260901143431.png \-a
+.TP
+.B 9. Scramble image using 2D Arnold Cat Map chaotic transformation:
+matazero encrypt IMG20260901143431.jpg \-p "VaultKey#99" \-m chaos \-o chaos-IMG20260901143431.png \-a
+.TP
+.B 10. Package evidence into an authenticated forensic container (.mataenc):
+matazero encrypt IMG20260901143431.jpg \-p "LegalHold#2026" \-\-container \-o evidence-IMG20260901143431.mataenc \-a
+.TP
+.B 11. Decrypt scrambled image using passkey:
+matazero decrypt encrypted-IMG20260901143431.png \-p "Case#2026-Secret" \-o decrypted-IMG20260901143431.png \-a
+.TP
+.B 12. Decrypt scrambled image directly using 32-bit PRNG seed:
+matazero decrypt encrypted-IMG20260901143431.png \-\-seed 1006181859 \-o decrypted-IMG20260901143431.png \-a
+.TP
+.B 13. Recover passkey using automated entropy-guided dictionary recovery:
+matazero decrypt encrypted-IMG20260901143431.png \-\-brute\-force \-w ./wordlist.txt \-a
+.TP
+.B 14. Embed encrypted forensic message into image LSB bitplanes:
+matazero stego IMG20260901143431.jpg \-\-inject "Classified finding at 0x4F00" \-p "StegoSecret#2026" \-o stego-IMG20260901143431.png \-a
+.TP
+.B 15. Extract hidden message from suspect carrier:
+matazero stego stego-IMG20260901143431.png \-\-extract \-p "StegoSecret#2026" \-a
 
 .SH SEE ALSO
 .BR exiftool (1),

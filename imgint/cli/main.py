@@ -75,6 +75,8 @@ from imgint.cli.commands import ask as ask_mod
 from imgint.cli.commands import model as model_mod
 from imgint.cli.commands import doctor as doctor_mod
 from imgint.cli.commands import completion as completion_mod
+from imgint.cli.commands import decrypt as decrypt_mod
+from imgint.cli.commands import encrypt as encrypt_mod
 
 cli.add_command(scope_mod.scope)
 cli.add_command(analyze_mod.analyze)
@@ -88,6 +90,8 @@ cli.add_command(corpus_mod.corpus)
 cli.add_command(geo_mod.geo_group, name="geo")
 cli.add_command(diff_mod.diff)
 cli.add_command(stego_mod.stego)
+cli.add_command(decrypt_mod.decrypt)
+cli.add_command(encrypt_mod.encrypt)
 cli.add_command(timeline_mod.timeline)
 cli.add_command(motion_mod.motion)
 cli.add_command(cluster_mod.cluster)
@@ -97,6 +101,7 @@ cli.add_command(ask_mod.ask)
 cli.add_command(model_mod.model_group, name="model")
 cli.add_command(doctor_mod.doctor)
 cli.add_command(completion_mod.completion)
+
 
 def main():
     try:

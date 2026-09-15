@@ -382,8 +382,28 @@ class AnalysisPipeline:
                 record.add_diagnostic(
                     level="warning",
                     message=f"Ollama vision analysis failed: {e}",
-                    source="ollama_vision_analyzer",
+                    source="ollama_vision",
                 )
+
+        # Tier 6 Crypto / Scrambler heuristic detection
+        if 6 in self.selected_tiers:
+            try:
+                from imgint.core.crypto.detector import EncryptionDetector
+                enc_res = EncryptionDetector.analyze_file(ctx.file_path)
+                if enc_res.is_encrypted:
+                    record.add_finding(
+                        Finding(
+                            name="encrypted_or_scrambled_image",
+                            value=enc_res.to_dict(),
+                            tier=6,
+                            extractor="encryption_detector",
+                            confidence=Confidence.OBSERVED,
+                            caveat="Image pixels appear scrambled or encrypted; visual contents obscured until decrypted.",
+                            provenance=Provenance(source_layer="crypto", extractor="encryption_detector"),
+                        )
+                    )
+            except Exception as e:
+                pass
 
         for f in record.findings:
             if f.name == "image_data_stream_sha256":

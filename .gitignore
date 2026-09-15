@@ -48,6 +48,7 @@ cleaned.jpg
 *.kmz
 scope.json
 ip_sample.json
+bitplane_slices/
 
 # IDE & OS files
 .vscode/

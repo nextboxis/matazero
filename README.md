@@ -208,7 +208,52 @@ matazero stego suspect.png -a --save-bitplanes ./bitplane_slices
 ### 7. Chronolocation & Forensic Geolocation
 Calculate sun position and verify photo timestamp against physical daylight angles:
 ```bash
-matazero locate photo.jpg -a
+matazero locate IMG20260901143431.jpg -a
+```
+
+### 8. Evidence Encryption & Forensic Packaging (`encrypt`)
+Scramble rasters using PRNG stream ciphers (Mulberry32), chaotic phase transformations (Arnold's Cat Map), or seal complete files inside tamper-evident authenticated containers (`.mataenc`):
+```bash
+# Scramble image rasters using Mulberry32 PRNG cipher with passkey
+matazero encrypt IMG20260901143431.jpg -p "Case#2026-Secret" -m mulberry32 -o encrypted-IMG20260901143431.png -a
+
+# Scramble image using 2D Arnold Cat Map chaotic matrix permutation
+matazero encrypt IMG20260901143431.jpg -p "VaultKey#99" -m chaos -o chaos-IMG20260901143431.png -a
+
+# Package entire evidence file into a tamper-evident AES-256-GCM container (.mataenc)
+matazero encrypt IMG20260901143431.jpg -p "LegalHold#2026" --container -o evidence-IMG20260901143431.mataenc -a
+```
+
+> [!NOTE]
+> **Subcommand Requirement**: Always include the command verb (`encrypt`, `decrypt`, `stego`, `analyze`, `scan`). Invoking `matazero <file> ...` without a subcommand defaults to `analyze`, which does not accept encryption or decryption options like `-p` or `--container`.
+
+### 9. Forensic Decryption & Passkey Recovery (`decrypt`)
+De-scramble obfuscated rasters using known passkeys, direct 32-bit seeds, or automated entropy-guided dictionary cracking:
+```bash
+# Decrypt image using passkey
+matazero decrypt encrypted-IMG20260901143431.png -p "Case#2026-Secret" -o decrypted-IMG20260901143431.png -a
+
+# Decrypt directly using recovered 32-bit PRNG seed (e.g. 1006181859 for 'Case#2026-Secret')
+matazero decrypt encrypted-IMG20260901143431.png --seed 1006181859 -o decrypted-IMG20260901143431.png -a
+
+# Recover passkey automatically via entropy-guided dictionary heuristics
+matazero decrypt encrypted-IMG20260901143431.png --brute-force -w ./wordlist.txt -a
+
+# Decrypt an authenticated forensic container (.mataenc)
+matazero decrypt evidence-IMG20260901143431.mataenc -p "LegalHold#2026" -o recovered-IMG20260901143431.jpg -a
+```
+
+### 10. Steganographic Carrier Injection & Extraction (`stego`)
+Inject or extract covert text/data payloads in RGB bitplanes or trailing spaces with AES-GCM encryption:
+```bash
+# Hide an encrypted forensic message inside image LSB bitplanes
+matazero stego IMG20260901143431.jpg --inject "Confidential finding: verified unaltered camera sensor" -p "StegoSecret#2026" -o stego-IMG20260901143431.png -a
+
+# Extract hidden message from suspect carrier using passkey
+matazero stego stego-IMG20260901143431.png --extract -p "StegoSecret#2026" -a
+
+# Perform multi-channel bitplane slicing & Chi-Square Pair-of-Values test
+matazero stego IMG20260901143431.jpg -a --save-bitplanes ./bitplane_slices
 ```
 
 ---
@@ -246,9 +291,11 @@ Core Commands:
   doctor      System health & environment diagnostic (Python, sandbox, Ollama, storage)
   scan        Smart 1-command evidence auto-triage with live progress and HTML dossier
   analyze     Run 7 extraction tiers over evidence files (supports -r, --glob, --filter, -j)
+  decrypt     Forensic image decryption, de-scrambling, and dictionary passkey recovery
+  encrypt     Encrypt/scramble images or package into tamper-evident forensic containers (.enc)
   ask         Interrogate an evidence image using your local Ollama vision model (offline)
   diff        Forensic comparison between two images (structure, metadata, DQT, pixels)
-  stego       Deep steganography, bitplane slicing (0-7), and Chi-Square PoV inspection
+  stego       Deep steganography, bitplane slicing (0-7), and LSB/trailing payload injection/extraction
   timeline    Reconstruct multi-asset chronological timelines and estimate clock drift
   cluster     Group evidence files by camera fleet, DQT tables, GPS, or visual similarity
   motion      Detect and carve embedded MP4/HEVC video streams from motion photos
@@ -277,10 +324,71 @@ Core Commands:
 | `analyze` | `-c` | `--carve` | Automatically extract trailing payloads and archives |
 | `analyze` | `-j` | `--jobs` | Number of parallel worker threads |
 | `analyze` | `-f` | `--format` | Output format: `report`, `dashboard`, `deep`, `json`, `html` |
+| `decrypt` | `-p` | `--password` | Decryption password/passkey |
+| `decrypt` | | `--seed` | Direct 32-bit PRNG seed (decimal or hex e.g. `1260129352`) |
+| `decrypt` | | `--brute-force` | Run automated entropy-guided dictionary & candidate recovery |
+| `decrypt` | `-w` | `--wordlist` | Custom wordlist path for dictionary recovery |
+| `decrypt` | `-m` | `--method` | Decryption cipher algorithm: `auto`, `mulberry32`, `chaos`, `aes-256-gcm` |
+| `encrypt` | `-p` | `--password` | Encryption passkey |
+| `encrypt` | `-m` | `--method` | Cipher algorithm: `mulberry32`, `chaos`, `aes-256-gcm`, `aes-256-cbc` |
+| `encrypt` | | `--container` | Package entire file into tamper-evident `.mataenc` container |
+| `stego` | | `--extract` | Extract hidden steganographic message or payload |
+| `stego` | | `--inject` | Text message to embed into image LSBs |
+| `stego` | `-p` | `--password` | Password for stego payload encryption/decryption |
+| `stego` | | `--save-bitplanes` | Directory to save extracted bitplane PNG images |
 | `ask` | `-m` | `--model` | Local Ollama vision model (`llama3.2-vision`, `moondream`) |
 | `locate` | `-f` | `--format` | Output: `table`, `json`, `geojson`, `html`, `kml`, `kmz` |
 | `extract` | `-a` | `--all` | Extract all embedded artefacts, previews, and payloads |
 | `extract` | `-c` | `--payload` | Extract trailing payload archives past EOI |
+
+### 💻 Sample CLI Recipes by Scenario
+
+```bash
+# 1. High-Throughput Batch Triage & HTML Dossier Generation
+matazero scan . -o case_dossier.html
+
+# 2. Deep 7-Tier Forensic Examination (Single Image)
+matazero analyze IMG20260901143431.jpg -a --deep -o forensic_report.json -f json
+
+# 3. Encrypt Image Pixels using Mulberry32 PRNG Stream Cipher
+matazero encrypt IMG20260901143431.jpg -p "Case#2026-Secret" -m mulberry32 -o encrypted-IMG20260901143431.png -a
+
+# 4. Scramble Image using Chaotic Phase Permutation (Arnold's Cat Map)
+matazero encrypt IMG20260901143431.jpg -p "VaultKey#99" -m chaos -o chaos-IMG20260901143431.png -a
+
+# 5. Encapsulate Evidence into Authenticated AES-256-GCM Container
+matazero encrypt IMG20260901143431.jpg -p "LegalHold#2026" --container -o evidence-IMG20260901143431.mataenc -a
+
+# 6. Decrypt Scrambled Image with Known Passkey
+matazero decrypt encrypted-IMG20260901143431.png -p "Case#2026-Secret" -o decrypted-IMG20260901143431.png -a
+
+# 7. Deterministic Decryption via 32-Bit PRNG Seed
+matazero decrypt encrypted-IMG20260901143431.png --seed 1006181859 -o decrypted-IMG20260901143431.png -a
+
+# 8. Automated Entropy-Guided Dictionary Cracking for Unknown Passkeys
+matazero decrypt encrypted-IMG20260901143431.png --brute-force -w ./wordlist.txt -a
+
+# 9. Decrypt Authenticated Container (.mataenc)
+matazero decrypt evidence-IMG20260901143431.mataenc -p "LegalHold#2026" -o recovered-IMG20260901143431.jpg -a
+
+# 10. Covert LSB Payload Injection with AES Encryption
+matazero stego IMG20260901143431.jpg --inject "Subject located at 48.8584, 2.2945" -p "StegoSecret#2026" -o stego-IMG20260901143431.png -a
+
+# 11. Extract Covert LSB Payload from Carrier Image
+matazero stego stego-IMG20260901143431.png --extract -p "StegoSecret#2026" -a
+
+# 12. Multi-Channel Bitplane Slicing & Visual Steganalysis
+matazero stego IMG20260901143431.jpg -a --save-bitplanes ./bitplane_output/
+
+# 13. Offline AI Visual Verification (Ollama)
+matazero ask IMG20260901143431.jpg "Identify make, model, color, and license plate of vehicles" -m llama3.2-vision
+
+# 14. Camera Hardware Fleet Clustering & Anomaly Detection
+matazero cluster . -a -r -k camera --outliers
+
+# 15. Chronolocation & Solar Elevation Angle Verification
+matazero locate IMG20260901143431.jpg -a -f table
+```
 
 </details>
 

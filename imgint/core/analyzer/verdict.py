@@ -90,6 +90,7 @@ class AuthenticityEvaluator:
             "steganography_suspected": False,
             "trailing_payload_detected": False,
             "c2pa_signed": False,
+            "is_encrypted": False,
         }
 
         score = BASE_SCORE
@@ -135,6 +136,13 @@ class AuthenticityEvaluator:
             reasons.append(f"2D FFT power spectrum detected periodic checkerboard grid artifacts (Peak ratio: {fft_f.value.get('fft_peak_ratio')}).")
             contradicting.append(f"2D FFT power spectrum detected periodic checkerboard grid artifacts (Peak ratio: {fft_f.value.get('fft_peak_ratio')}).")
             score = min(score, AI_FFT_SCORE_CEILING)
+            risk_level = "HIGH"
+
+        enc_f = next((f for f in record.findings if f.name == "encrypted_or_scrambled_image"), None)
+        if enc_f and isinstance(enc_f.value, dict) and enc_f.value.get("is_encrypted"):
+            flags["is_encrypted"] = True
+            reasons.append("Image raster is mathematically scrambled or encrypted (uniform pseudo-random noise).")
+            contradicting.append("Image raster contains encrypted data; visual evidence obscured until decrypted.")
             risk_level = "HIGH"
 
         attr_f = next((f for f in record.findings if f.name == "encoder_attribution"), None)
@@ -233,7 +241,12 @@ class AuthenticityEvaluator:
 
         score = max(0.0, min(1.0, score))
 
-        if flags["trailing_payload_detected"]:
+        if flags.get("is_encrypted"):
+            is_authentic = None
+            verdict_label = "ENCRYPTED_OR_SCRAMBLED_CARRIER"
+            risk_level = "HIGH"
+            caveats.append("Image raster is scrambled or encrypted; run 'matazero decrypt <file>' to reveal contents.")
+        elif flags["trailing_payload_detected"]:
             is_authentic = False
             verdict_label = "TAMPERED_TRAILING_PAYLOAD"
             risk_level = "CRITICAL"

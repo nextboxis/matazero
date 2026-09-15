@@ -1,0 +1,24 @@
+{
+  "case_id": "CASE-2026-SAMPLE",
+  "purpose": "Sample OSINT and digital forensics demonstration",
+  "legal_basis": "Authorized Academic / Forensic Evaluation",
+  "authorising_party": "Forensic Review Board",
+  "data_subject_categories": [
+    "Sample Imagery"
+  ],
+  "permitted_operations": [
+    "tier1",
+    "tier2",
+    "tier3",
+    "tier4",
+    "tier5",
+    "tier6",
+    "tier7"
+  ],
+  "retention_period_days": 365,
+  "expiry_date": "2027-09-11T14:20:35.688884+00:00",
+  "disabled_analyzers": [],
+  "signature": null,
+  "scope_hash": "9201d4a2a16be454784f0008a6084418eb9905f13f2d1de1f6c117e71324f432",
+  "is_self_audit": false
+}
