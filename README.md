@@ -12,8 +12,8 @@
 # matazero
 ### Evidence-Grade Image Intelligence & Forensic Toolkit for OSINT
 
-[![Release](https://img.shields.io/badge/release-v2.1.0-blue.svg?style=flat-square)](https://github.com/nextboxis/matazero/releases)
-[![Tests](https://img.shields.io/badge/tests-34%20passed-success.svg?style=flat-square&logo=pytest)](tests/)
+[![Release](https://img.shields.io/badge/release-v2.2.0-blue.svg?style=flat-square)](https://github.com/nextboxis/matazero/releases)
+[![Tests](https://img.shields.io/badge/tests-47%20passed-success.svg?style=flat-square&logo=pytest)](tests/)
 [![Container](https://img.shields.io/badge/docker-ghcr.io-blueviolet.svg?style=flat-square&logo=docker)](https://github.com/users/nextboxis/packages?repo_name=matazero)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-informational.svg?style=flat-square&logo=python)](https://python.org)
 [![Air-Gapped OPSEC](https://img.shields.io/badge/opsec-100%25%20offline-success.svg?style=flat-square)](docs/SECURITY.md)
@@ -44,6 +44,15 @@
 * **Attribution Even When Metadata is Stripped**: Social platforms (Twitter, Telegram, WhatsApp) aggressively strip EXIF tags. `matazero` inspects the underlying **JPEG compression matrix** — Quantization Tables (`DQT`), Huffman tables (`DHT`), chroma subsampling (`SOF`), and segment prefix orders — to mathematically attribute images to specific camera hardware ISPs, editing suites, or Generative AI pipelines.
 * **100% Offline & Private**: Zero telemetry. Zero remote cloud calls. Local offline solar chronolocation, local reverse geocoding, and local vision model interrogation (via Ollama).
 * **Forensic Chain of Custody**: Every finding carries verifiable provenance and confidence ratings. Case operations produce tamper-evident, append-only **SHA-256 hash-chained audit trails**.
+
+### 🌟 What's New in v2.2.0
+
+* ⚡ **Ultra-Responsive CLI Startup**: Replaced eager submodule imports with dynamic lazy loaders, eliminating module collision `RuntimeWarning` notices and cutting CLI startup latency.
+* 🛡️ **High-Level Military-Grade AES-256 Ciphers**: Native AES-256-GCM authenticated pixel encryption and AES-256-CBC with auto-injected `matazero_crypto` PNG metadata chunks for seamless 1-command decryption.
+* 🔎 **Accurate Triage Verdicts**: Fixed verdict confidence mapping in `scan` and `case_dossier.html`, correctly distinguishing Authentic Camera Captures, Tampered Images, and Encrypted Carriers.
+* 🌐 **Cross-Platform Wildcard & Glob Expansion**: Unified path resolution supporting recursive directory walks and quoted globs (`*.jpg`, `cases/**/IMG*`) identically across Linux, macOS, CMD, and PowerShell.
+* 🛑 **Graceful SIGINT Handling**: Clean user abort handling on Ctrl+C (Exit code 130) without unhandled Python tracebacks.
+* 🧪 **Comprehensive Test Suite**: Restored and validated complete unit and regression test suite (47 passed, 2 skipped).
 
 ```
                            ┌───────────────────────────────┐
@@ -212,8 +221,14 @@ matazero locate IMG20260901143431.jpg -a
 ```
 
 ### 8. Evidence Encryption & Forensic Packaging (`encrypt`)
-Scramble rasters using PRNG stream ciphers (Mulberry32), chaotic phase transformations (Arnold's Cat Map), or seal complete files inside tamper-evident authenticated containers (`.mataenc`):
+Scramble rasters using PRNG stream ciphers (Mulberry32), chaotic phase transformations (Arnold's Cat Map), authenticated military-grade AES-256 pixel ciphers (with embedded PNG metadata tags for seamless auto-decryption), or seal complete files inside tamper-evident authenticated containers (`.mataenc`):
 ```bash
+# High-grade AES-256-GCM authenticated pixel encryption with auto-generated metadata chunk
+matazero encrypt IMG20260901143431.jpg -p "Case#2026-Secret" -m aes-256-gcm -o encrypted-aes.png -a
+
+# AES-256-CBC pixel encryption with PKCS#7 padding
+matazero encrypt IMG20260901143431.jpg -p "Case#2026-Secret" -m aes-256-cbc -o encrypted-cbc.png -a
+
 # Scramble image rasters using Mulberry32 PRNG cipher with passkey
 matazero encrypt IMG20260901143431.jpg -p "Case#2026-Secret" -m mulberry32 -o encrypted-IMG20260901143431.png -a
 
@@ -228,9 +243,12 @@ matazero encrypt IMG20260901143431.jpg -p "LegalHold#2026" --container -o eviden
 > **Subcommand Requirement**: Always include the command verb (`encrypt`, `decrypt`, `stego`, `analyze`, `scan`). Invoking `matazero <file> ...` without a subcommand defaults to `analyze`, which does not accept encryption or decryption options like `-p` or `--container`.
 
 ### 9. Forensic Decryption & Passkey Recovery (`decrypt`)
-De-scramble obfuscated rasters using known passkeys, direct 32-bit seeds, or automated entropy-guided dictionary cracking:
+De-scramble obfuscated rasters using known passkeys, direct 32-bit seeds, automated metadata extraction, or automated entropy-guided dictionary cracking:
 ```bash
-# Decrypt image using passkey
+# Decrypt AES-256 pixel ciphertext (automatically detects cipher mode and salt/IV from PNG metadata)
+matazero decrypt encrypted-aes.png -p "Case#2026-Secret" -o decrypted-aes.png -a
+
+# Decrypt PRNG/chaotic scrambled image using passkey
 matazero decrypt encrypted-IMG20260901143431.png -p "Case#2026-Secret" -o decrypted-IMG20260901143431.png -a
 
 # Decrypt directly using recovered 32-bit PRNG seed (e.g. 1006181859 for 'Case#2026-Secret')
