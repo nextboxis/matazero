@@ -53,7 +53,7 @@ def encrypt(
     target_path = Path(target)
     effective_method = method.lower()
 
-    if as_container or effective_method in ["aes-256-gcm", "aes-256-cbc"] and as_container:
+    if as_container or (effective_method in ["aes-256-gcm", "aes-256-cbc"] and out_file and out_file.endswith(".enc")):
         if not out_file:
             out_file = str(target_path.parent / f"encrypted-{target_path.stem}.enc")
         try:
@@ -68,15 +68,24 @@ def encrypt(
         out_file = str(target_path.parent / f"encrypted-{target_path.stem}.png")
 
     try:
+        import json
+        from PIL.PngImagePlugin import PngInfo
+
         img = Image.open(target_path)
+        pnginfo = PngInfo()
+
         if effective_method == "mulberry32":
             enc_img = Mulberry32Cipher.encrypt(img, password)
         elif effective_method == "chaos":
             enc_img = ArnoldCatMapCipher.encrypt(img)
+        elif effective_method in ("aes-256-gcm", "aes-256-cbc"):
+            aes_mode = "gcm" if "gcm" in effective_method else "cbc"
+            enc_img, crypto_meta = AesImageCipher.encrypt_pixels(img, password, mode=aes_mode)
+            pnginfo.add_text("matazero_crypto", json.dumps(crypto_meta))
         else:
             enc_img = Mulberry32Cipher.encrypt(img, password)
 
-        enc_img.save(out_file, format="PNG")
+        enc_img.save(out_file, format="PNG", pnginfo=pnginfo)
     except Exception as e:
         err_console.print(f"[bold red]Encryption failed:[/bold red] {e}")
         sys.exit(ExitCode.GENERIC_ERROR)

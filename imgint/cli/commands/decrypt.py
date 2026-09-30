@@ -80,8 +80,19 @@ def decrypt(
             err_console.print(f"[bold red]Decryption failed:[/bold red] {e}")
             sys.exit(ExitCode.GENERIC_ERROR)
 
+    import json
     img = Image.open(target_path)
     effective_method = method.lower()
+
+    crypto_meta = None
+    if hasattr(img, "text") and "matazero_crypto" in img.text:
+        try:
+            crypto_meta = json.loads(img.text["matazero_crypto"])
+            if effective_method == "auto":
+                effective_method = f"aes-256-{crypto_meta.get('mode', 'gcm').lower()}"
+        except Exception:
+            pass
+
     if effective_method == "auto":
         effective_method = "mulberry32"
 
@@ -116,12 +127,19 @@ def decrypt(
                 console.print("[yellow][!] Dictionary recovery found no alternate candidates; proceeding with provided parameters.[/yellow]")
 
     try:
-        if effective_method == "mulberry32":
+        if effective_method in ("aes-256-gcm", "aes-256-cbc") or crypto_meta is not None:
+            if not used_password:
+                err_console.print("[bold red]Error:[/bold red] AES pixel decryption requires --password (-p).")
+                sys.exit(ExitCode.USAGE_ERROR)
+            if crypto_meta is None:
+                err_console.print("[bold red]Error:[/bold red] Missing cryptographic metadata (salt/IV/tag) for AES pixel decryption.")
+                sys.exit(ExitCode.USAGE_ERROR)
+            dec_img = AesImageCipher.decrypt_pixels(img, used_password, crypto_meta)
+        elif effective_method == "mulberry32":
             dec_img = Mulberry32Cipher.decrypt(img, key=used_password, seed=parsed_seed)
         elif effective_method == "chaos":
             dec_img = ArnoldCatMapCipher.decrypt(img)
         else:
-            # Fallback to Mulberry32
             dec_img = Mulberry32Cipher.decrypt(img, key=used_password, seed=parsed_seed)
 
         dec_img.save(out_file, format="PNG")
@@ -155,6 +173,5 @@ def decrypt(
     panel_text.append(f"[{status_text}]\n\n", style=status_color)
     panel_text.append(f"Decrypted Image:     ", style="dim")
     panel_text.append(f"{out_file}\n", style="bold green")
-
 
     console.print(Panel(panel_text, title="[bold]matazero Forensic Decryption Report[/bold]", border_style="green" if is_clean else "yellow"))
