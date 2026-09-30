@@ -1,5 +1,5 @@
 .\" Manpage for matazero
-.TH MATAZERO 1 "September 2026" "matazero 2.1.0" "User Commands"
+.TH MATAZERO 1 "September 2026" "matazero 2.2.0" "User Commands"
 .SH NAME
 matazero \- Image Intelligence Toolkit for Ethical OSINT and Digital Forensics
 
@@ -38,12 +38,6 @@ Encrypt or scramble image rasters using PRNG/chaotic ciphers (Mulberry32, Arnold
 .TP
 .B ask \fITARGET QUESTION\fR
 Interrogate an evidence image using your local Ollama vision model (100% offline).
-.TP
-.B model list
-Discover and inspect local vision models available in your Ollama daemon.
-.TP
-.B diff \fIIMAGE1 IMAGE2\fR
-Forensic comparison between two images (structural units, metadata delta, DQT tables, and pixel SSIM).
 .TP
 .B stego \fITARGET\fR [\fIOPTIONS\fR]
 Deep steganography analysis, multi-channel bitplane slicing (planes 0-7), Chi-Square Pair-of-Values test, and AES-GCM encrypted LSB/trailing payload injection and extraction.
