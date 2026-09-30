@@ -1,23 +1,12 @@
 """Command-line interface for imgint per SRD §3.10 and SRS §3.1."""
 
-from __future__ import annotations
-import json
-import os
 import sys
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from typing import List, Optional, Dict, Any
 
 import click
 from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.text import Text
 
 from imgint import __version__
-from imgint.cli.commands._utils import resolve_scope, ExitCode, expand_targets, IMAGE_EXTENSIONS
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
-import concurrent.futures
+from imgint.cli.commands._utils import ExitCode
 
 try:
     if hasattr(sys.stdout, "reconfigure"):
@@ -106,6 +95,9 @@ cli.add_command(completion_mod.completion)
 def main():
     try:
         cli()
+    except KeyboardInterrupt:
+        err_console.print("\n[yellow]Operation aborted by user.[/yellow]")
+        sys.exit(130)
     except Exception as e:
         err_console.print(f"[red]Fatal Error:[/red] {e}")
         sys.exit(ExitCode.ERROR_INTERNAL)

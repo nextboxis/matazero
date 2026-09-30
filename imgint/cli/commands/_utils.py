@@ -22,6 +22,8 @@ class ExitCode(enum.IntEnum):
     PARTIAL_FAILURE = 4
     SCOPE_ERROR = 6
     CUSTODY_ERROR = 7
+    ERROR_INTERNAL = 1
+
 
 
 def resolve_scope(
@@ -88,7 +90,21 @@ def expand_targets(
     results: List[Path] = []
     seen: set = set()
     
+    import glob
+
     for t in targets:
+        # Check if target contains glob wildcards (e.g. quoted patterns on Windows or Linux)
+        if any(c in t for c in ("*", "?", "[")):
+            matched = glob.glob(t, recursive=recursive)
+            for m in sorted(matched):
+                mp = Path(m)
+                if mp.is_file() and mp.suffix.lower() in IMAGE_EXTENSIONS:
+                    rmp = mp.resolve()
+                    if rmp not in seen:
+                        seen.add(rmp)
+                        results.append(rmp)
+            continue
+
         p = Path(t)
         if p.is_file():
             rp = p.resolve()
@@ -104,7 +120,7 @@ def expand_targets(
                     if rf not in seen:
                         seen.add(rf)
                         results.append(rf)
-    
+
     return results
 
 
