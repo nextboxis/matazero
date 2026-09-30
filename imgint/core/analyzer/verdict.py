@@ -67,7 +67,11 @@ class AuthenticityVerdict:
     inconclusive_signals: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        d["rating"] = self.verdict_label
+        d["confidence"] = self.confidence_score
+        return d
+
 
 
 class AuthenticityEvaluator:
