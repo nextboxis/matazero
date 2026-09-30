@@ -32,14 +32,14 @@ class CaseDossierGenerator:
 
         for rec in records:
             verdict_dict = rec.authenticity_verdict or {}
-            rating = verdict_dict.get("rating", "UNVERIFIED_METADATA_STRIPPED")
-            conf = verdict_dict.get("confidence", 0.5)
+            rating = str(verdict_dict.get("verdict_label") or verdict_dict.get("rating") or "UNVERIFIED_METADATA_STRIPPED").upper()
+            conf = verdict_dict.get("confidence_score", verdict_dict.get("confidence", 0.5))
 
             if "AUTHENTIC" in rating:
                 authentic_count += 1
                 badge_class = "badge-authentic"
                 badge_text = "Authentic Capture"
-            elif "TAMPERED" in rating:
+            elif any(k in rating for k in ("TAMPERED", "MODIFIED", "TRAILING")):
                 tampered_count += 1
                 badge_class = "badge-tampered"
                 badge_text = "Tampered / Payload"
@@ -47,6 +47,9 @@ class CaseDossierGenerator:
                 synthetic_count += 1
                 badge_class = "badge-synthetic"
                 badge_text = "AI / Synthetic"
+            elif "ENCRYPTED" in rating or "SCRAMBLED" in rating:
+                badge_class = "badge-tampered"
+                badge_text = "Encrypted Carrier"
             else:
                 unverified_count += 1
                 badge_class = "badge-unverified"
