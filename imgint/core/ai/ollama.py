@@ -5,6 +5,7 @@ import base64
 import json
 import urllib.request
 import urllib.error
+import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -24,12 +25,26 @@ DEFAULT_HOST = "http://localhost:11434"
 HEALTH_CHECK_TIMEOUT = 3
 TAGS_TIMEOUT = 5
 DEFAULT_VISION_MODEL = "llama3.2-vision"
+ALLOWED_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "host.docker.internal"}
+
 
 class OllamaClient:
     """Zero-dependency local HTTP client for communicating with Ollama on localhost."""
 
-    def __init__(self, host: str = DEFAULT_HOST, timeout: int = 120) -> None:
-        self.host = host.rstrip("/")
+    def __init__(self, host: str = DEFAULT_HOST, timeout: int = 120, allow_remote: bool = False) -> None:
+        clean_host = (host or DEFAULT_HOST).strip().rstrip("/")
+        parsed = urllib.parse.urlparse(clean_host)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(f"Forbidden URL scheme '{parsed.scheme}' for OllamaClient; only http/https allowed.")
+        hostname = (parsed.hostname or "").lower()
+        if not hostname:
+            raise ValueError(f"Invalid Ollama host URL: {host!r}")
+        if not allow_remote and hostname not in ALLOWED_LOCAL_HOSTS:
+            raise ValueError(
+                f"Remote Ollama host '{hostname}' is blocked by offline OPSEC policy (GR-4.1). "
+                f"Use a loopback address ({', '.join(sorted(ALLOWED_LOCAL_HOSTS))})."
+            )
+        self.host = clean_host
         self.timeout = timeout
 
     def is_available(self) -> bool:
