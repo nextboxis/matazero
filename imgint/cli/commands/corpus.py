@@ -56,15 +56,15 @@ def corpus_list() -> None:
 def corpus_learn(target: str, entry_id: str, model: str, encoder: str) -> None:
     """Learn and register a new camera fingerprint from a reference JPEG."""
     p = Path(target)
-    reader = BoundedReader(p)
-    detected = FormatDetector.detect(reader)
-    if detected.format_name != "JPEG":
-        err_console.print(f"[red]Corpus learning currently requires JPEG reference images (detected: {detected.format_name})[/red]")
-        sys.exit(3)
+    with BoundedReader(p) as reader:
+        detected = FormatDetector.detect(reader)
+        if detected.format_name != "JPEG":
+            err_console.print(f"[red]Corpus learning currently requires JPEG reference images (detected: {detected.format_name})[/red]")
+            sys.exit(3)
 
-    registry = create_default_container_registry()
-    container_reader = registry.get_reader("JPEG")
-    units, blocks, diags = container_reader.read(reader)
+        registry = create_default_container_registry()
+        container_reader = registry.get_reader("JPEG")
+        units, blocks, diags = container_reader.read(reader)
 
     dqt_tables = []
     subsampling_info = None
