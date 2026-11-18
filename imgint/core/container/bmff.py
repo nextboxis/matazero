@@ -72,25 +72,29 @@ class BmffContainerReader(ContainerReader):
             )
 
             if box_type == "Exif":
-                raw_exif = payload_bytes
-                if raw_exif.startswith(b"Exif\x00\x00"):
-                    raw_exif = raw_exif[6:]
+                full_len = min(data_len, reader.max_read_size)
+                raw_exif = reader.read_bytes(data_offset, full_len) if full_len > 0 else b""
+                exif_sig_idx = raw_exif.find(b"Exif\x00\x00", 0, 16)
+                if exif_sig_idx != -1:
+                    raw_exif = raw_exif[exif_sig_idx + 6 :]
                 blocks.append(
                     MetadataBlock(
                         kind="EXIF",
                         offset=data_offset,
-                        length=data_len,
+                        length=len(raw_exif),
                         raw_bytes=raw_exif,
                         source_unit="BMFF_Exif",
                     )
                 )
             elif box_type == "mime" and b"application/rdf+xml" in payload_bytes:
+                full_len = min(data_len, reader.max_read_size)
+                raw_xmp = reader.read_bytes(data_offset, full_len) if full_len > 0 else b""
                 blocks.append(
                     MetadataBlock(
                         kind="XMP",
                         offset=data_offset,
-                        length=data_len,
-                        raw_bytes=payload_bytes,
+                        length=len(raw_xmp),
+                        raw_bytes=raw_xmp,
                         source_unit="BMFF_mime_xmp",
                     )
                 )
