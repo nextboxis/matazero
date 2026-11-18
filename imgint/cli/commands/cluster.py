@@ -15,8 +15,9 @@ err_console = Console(stderr=True, highlight=False)
 
 @click.command("cluster")
 @click.argument("targets", nargs=-1, required=True, type=click.Path())
-@click.option("--by", "strategy", type=click.Choice(["camera", "dqt", "geo", "visual"]), default="camera", help="Clustering dimension (default: camera)")
+@click.option("-k", "--by", "strategy", type=click.Choice(["camera", "dqt", "geo", "visual"]), default="camera", help="Clustering dimension (default: camera)")
 @click.option("--radius", "geo_radius", default=5.0, type=float, help="Geospatial clustering radius in km (default: 5.0)")
+@click.option("--outliers", "show_outliers", is_flag=True, help="Highlight single-image anomaly outliers outside main camera fleet")
 @click.option("-f", "--format", "out_fmt", type=click.Choice(["table", "json"]), default="table", help="Output format")
 @click.option("-o", "--out", "out_file", default=None, type=click.Path(), help="Write clustering report to file")
 @click.option("-r", "--recursive", is_flag=True, help="Recursively search directory targets for images")
@@ -27,6 +28,7 @@ def cluster(
     targets: List[str],
     strategy: str,
     geo_radius: float,
+    show_outliers: bool,
     out_fmt: str,
     out_file: Optional[str],
     recursive: bool,
