@@ -104,8 +104,8 @@ def analyze(
         try:
             rec = pipeline.analyze_file(target_path)
             if carve and rec.structural_units:
-                reader = BoundedReader(target_path)
-                carved = PayloadCarver.carve_trailing_payload(reader, rec.structural_units, carve_dir)
+                with BoundedReader(target_path) as reader:
+                    carved = PayloadCarver.carve_trailing_payload(reader, rec.structural_units, carve_dir)
                 if carved:
                     console.print(
                         f"[green][OK] Carved {carved.payload_type} ({carved.size:,} B) from {target_path.name} -> [bold]{carved.output_path}[/bold][/green]"
