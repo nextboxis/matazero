@@ -19,19 +19,19 @@ err_console = Console(stderr=True, highlight=False)
 def probe(target: str) -> None:
     """Dump container segment and chunk structure with byte offsets."""
     p = Path(target)
-    reader = BoundedReader(p)
-    detected = FormatDetector.detect(reader)
+    with BoundedReader(p) as reader:
+        detected = FormatDetector.detect(reader)
 
-    console.print(f"[bold cyan]matazero Container Probe[/bold cyan] — {p.name} ({detected.format_name})")
-    console.print(f"MIME: {detected.mime_type} | Size: {reader.size:,} bytes | Magic: {detected.magic_hex}\n")
+        console.print(f"[bold cyan]matazero Container Probe[/bold cyan] — {p.name} ({detected.format_name})")
+        console.print(f"MIME: {detected.mime_type} | Size: {reader.size:,} bytes | Magic: {detected.magic_hex}\n")
 
-    registry = create_default_container_registry()
-    container_reader = registry.get_reader(detected.format_name)
-    if not container_reader:
-        err_console.print(f"[red]Unsupported container format: {detected.format_name}[/red]")
-        sys.exit(3)
+        registry = create_default_container_registry()
+        container_reader = registry.get_reader(detected.format_name)
+        if not container_reader:
+            err_console.print(f"[red]Unsupported container format: {detected.format_name}[/red]")
+            sys.exit(3)
 
-    units, blocks, diags = container_reader.read(reader)
+        units, blocks, diags = container_reader.read(reader)
 
     table = Table(title=f"Structural Units ({len(units)})")
     table.add_column("Offset", style="dim", justify="right")
