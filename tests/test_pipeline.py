@@ -1,19 +1,29 @@
 """End-to-end integration tests for AnalysisPipeline orchestration and lifecycle."""
 
 from pathlib import Path
+import struct
 import pytest
+from PIL import Image
 
 from imgint.core.pipeline import AnalysisPipeline
 from imgint.core.governance.scope import AuthorizationScope
 from imgint.core.event import ForensicEventBus, AnalysisStartedEvent, AnalysisCompletedEvent
 
 
-def test_pipeline_execution_sample_image():
+def _ensure_sample_jpeg(tmp_path: Path) -> Path:
     repo_root = Path(__file__).parent.parent
     sample_path = repo_root / "IMG20260829082025.jpg"
+    if sample_path.exists():
+        return sample_path
 
-    if not sample_path.exists():
-        pytest.skip(f"Sample image {sample_path} not found")
+    synth = tmp_path / "synthetic_camera_sample.jpg"
+    img = Image.new("RGB", (64, 64), color=(80, 140, 200))
+    img.save(synth, format="JPEG", quality=92)
+    return synth
+
+
+def test_pipeline_execution_sample_image(tmp_path):
+    sample_path = _ensure_sample_jpeg(tmp_path)
 
     scope = AuthorizationScope.create_self_audit_scope()
     pipeline = AnalysisPipeline(scope=scope, allow_network=False)
@@ -63,11 +73,7 @@ def test_pipeline_missing_file_raises():
 def test_pipeline_reader_closed_no_winerror32_on_unlink(tmp_path):
     """Verifies that BoundedReader is cleanly closed, preventing Windows WinError 32 file locks."""
     import shutil
-    repo_root = Path(__file__).parent.parent
-    sample_path = repo_root / "IMG20260829082025.jpg"
-
-    if not sample_path.exists():
-        pytest.skip(f"Sample image {sample_path} not found")
+    sample_path = _ensure_sample_jpeg(tmp_path)
 
     temp_copy = tmp_path / "temp_evidence.jpg"
     shutil.copy2(sample_path, temp_copy)

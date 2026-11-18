@@ -1180,14 +1180,23 @@ class GeoLocator:
     @classmethod
     def resolve_ip_online(cls, ip_address: str, timeout: int = 5) -> Optional[Dict[str, Any]]:
         """Resolves IP address to geolocation intelligence via public API (subject to GR-4.1 network governance)."""
+        import ipaddress
         import urllib.request
         clean_ip = str(ip_address).strip()
+        try:
+            ip_obj = ipaddress.ip_address(clean_ip)
+            if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_multicast or ip_obj.is_unspecified:
+                return None
+            clean_ip = str(ip_obj)
+        except ValueError:
+            return None
+
         url = f"http://ip-api.com/json/{clean_ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query"
 
         try:
             req = urllib.request.Request(
                 url,
-                headers={"User-Agent": "matazero_forensic_geolocator/2.0"}
+                headers={"User-Agent": "matazero_forensic_geolocator/2.3"}
             )
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 if resp.status == 200:

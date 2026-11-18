@@ -129,7 +129,7 @@ class LsbStego:
         }
 
         # Check for MATA_LSB header
-        if raw_extracted.startswith(LSB_MAGIC):
+        if raw_extracted.startswith(LSB_MAGIC) and len(raw_extracted) >= len(LSB_MAGIC) + 5:
             meta["has_mata_header"] = True
             offset = len(LSB_MAGIC)
             flags = raw_extracted[offset]
@@ -139,6 +139,12 @@ class LsbStego:
 
             (payload_len,) = struct.unpack(">I", raw_extracted[offset : offset + 4])
             offset += 4
+
+            required_end = offset + (28 + payload_len + 16 if is_enc else payload_len)
+            if payload_len == 0 or required_end > len(raw_extracted):
+                raise ValueError(
+                    f"Corrupted or truncated LSB header: claimed payload length ({payload_len:,} bytes) exceeds carrier capacity ({len(raw_extracted):,} bytes)."
+                )
             meta["extracted_length"] = payload_len
 
             if is_enc:
@@ -234,6 +240,10 @@ class TrailingPayload:
             meta["payload_type"] = "MATA_ENCRYPTED_CONTAINER"
             if not password:
                 return trailing, meta
+
+            min_len = len(MATA_CONTAINER_MAGIC) + 16 + 12 + 16
+            if len(trailing) < min_len:
+                raise ValueError(f"Truncated trailing encrypted container ({len(trailing)} bytes < {min_len} bytes).")
 
             # Decrypt in-memory
             magic_len = len(MATA_CONTAINER_MAGIC)

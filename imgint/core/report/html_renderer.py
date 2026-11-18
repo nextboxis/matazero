@@ -57,7 +57,9 @@ class HtmlReportRenderer:
         dims = f"{dim_finding.value.get('width', 0)} x {dim_finding.value.get('height', 0)} px" if dim_finding and isinstance(dim_finding.value, dict) else "N/A"
 
         color_finding = next((f for f in record.findings if f.name == "dominant_color_palette"), None)
-        dominant_hex = color_finding.value.get("dominant_hex", "#1B4255") if color_finding and isinstance(color_finding.value, dict) else "#1B4255"
+        raw_hex = str(color_finding.value.get("dominant_hex", "#1B4255")) if color_finding and isinstance(color_finding.value, dict) else "#1B4255"
+        import re
+        dominant_hex = raw_hex if re.match(r"^#[0-9A-Fa-f]{3,8}$", raw_hex) else "#1B4255"
 
         attribution_finding = next((f for f in record.findings if f.name == "encoder_attribution"), None)
         attribution_text = attribution_finding.value if attribution_finding else "Insufficient reference data"
@@ -74,7 +76,17 @@ class HtmlReportRenderer:
             )
         )
         conf_score = int(verdict.get("confidence_score", 0.5) * 100)
-        risk = verdict.get("risk_level", "LOW")
+        risk = html.escape(str(verdict.get("risk_level", "LOW")))
+        safe_place = html.escape(str(place)) if place else None
+        safe_lat = html.escape(str(lat)) if lat is not None else ""
+        safe_lon = html.escape(str(lon)) if lon is not None else ""
+        safe_dims = html.escape(str(dims))
+        safe_mime = html.escape(str(record.mime_type))
+        safe_sha_full = html.escape(str(record.sha256))
+        safe_scope = html.escape(str(record.scope_id or "SELF_AUDIT"))
+        safe_corpus = html.escape(str(record.corpus_version))
+        safe_ts = html.escape(str(record.timestamp_utc))
+        safe_tool_ver = html.escape(str(record.tool_version))
         reasons_list = "".join(
             f"<li>{html.escape(r)}</li>"
             for r in verdict.get("supporting_reasons", [])
@@ -291,12 +303,12 @@ class HtmlReportRenderer:
   <div class="header">
     <h1><span>🛡️</span> matazero Forensic Dossier — {file_name}</h1>
     <div class="header-meta">
-      <div class="header-item"><strong>Format</strong>{record.mime_type}</div>
+      <div class="header-item"><strong>Format</strong>{safe_mime}</div>
       <div class="header-item"><strong>File Size</strong>{record.file_size:,} bytes</div>
-      <div class="header-item"><strong>SHA-256</strong><span class="mono" title="{record.sha256}">{sha_short}</span></div>
-      <div class="header-item"><strong>Scope ID</strong>{record.scope_id or 'SELF_AUDIT'}</div>
-      <div class="header-item"><strong>Corpus Version</strong>{record.corpus_version}</div>
-      <div class="header-item"><strong>Analyzed (UTC)</strong>{record.timestamp_utc}</div>
+      <div class="header-item"><strong>SHA-256</strong><span class="mono" title="{safe_sha_full}">{sha_short}</span></div>
+      <div class="header-item"><strong>Scope ID</strong>{safe_scope}</div>
+      <div class="header-item"><strong>Corpus Version</strong>{safe_corpus}</div>
+      <div class="header-item"><strong>Analyzed (UTC)</strong>{safe_ts}</div>
     </div>
   </div>
 
@@ -359,16 +371,16 @@ class HtmlReportRenderer:
       <div class="card-body">
         <div class="widget-box">
           <div style="font-size: 1.1rem; margin-bottom: 8px;">
-            {'📍 ' + str(place) if place else '🌐 Offline Coordinates Badge'}
+            {'📍 ' + safe_place if safe_place else '🌐 Offline Coordinates Badge'}
           </div>
           <div class="mono" style="font-size: 0.95rem; color: #38BDF8;">
-            {'Lat: ' + str(lat) + '° | Lon: ' + str(lon) + '°' if has_gps else 'GPS Metadata Absent / Stripped'}
+            {'Lat: ' + safe_lat + '° | Lon: ' + safe_lon + '°' if has_gps else 'GPS Metadata Absent / Stripped'}
           </div>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem;">
           <div class="card p-2" style="padding: 10px; margin: 0;">
             <span class="text-dim">Dimensions:</span><br>
-            <strong>{dims}</strong>
+            <strong>{safe_dims}</strong>
           </div>
           <div class="card p-2" style="padding: 10px; margin: 0;">
             <span class="text-dim">Dominant Color:</span><br>
@@ -405,7 +417,7 @@ class HtmlReportRenderer:
 
   <!-- Footer -->
   <div class="text-center text-dim mt-4" style="font-size: 0.8rem; padding: 16px;">
-    matazero v{record.tool_version} • Cryptographic Chain of Custody Verified • Zero External Network Lookups
+    matazero v{safe_tool_ver} • Cryptographic Chain of Custody Verified • Zero External Network Lookups
   </div>
 </div>
 </body>

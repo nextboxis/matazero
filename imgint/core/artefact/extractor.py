@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import hashlib
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -59,20 +60,21 @@ class ArtefactExtractor:
         destination.mkdir(parents=True, exist_ok=True)
         extracted: List[ExtractedItem] = []
 
-        reader = BoundedReader(p)
-        detected = FormatDetector.detect(reader)
-        if not detected.is_supported:
-            reader.close()
-            return extracted
+        with BoundedReader(p) as reader:
+            detected = FormatDetector.detect(reader)
+            if not detected.is_supported:
+                return extracted
 
-        registry = create_default_container_registry()
-        container_reader = registry.get_reader(detected.format_name)
-        if not container_reader:
-            reader.close()
-            return extracted
+            registry = create_default_container_registry()
+            container_reader = registry.get_reader(detected.format_name)
+            if not container_reader:
+                return extracted
 
-        units, blocks, _ = container_reader.read(reader)
-        stem = p.stem
+            units, blocks, _ = container_reader.read(reader)
+            raw_bytes = reader.get_all_bytes() if include_preview else b""
+            carved = PayloadCarver.carve_trailing_payload(reader, units, destination) if include_payload else None
+
+        stem = re.sub(r"[^A-Za-z0-9._-]", "_", p.stem) or "evidence"
 
         if include_thumbnail:
             for b in blocks:
@@ -95,7 +97,6 @@ class ArtefactExtractor:
                         )
 
         if include_preview:
-            raw_bytes = reader.get_all_bytes()
             prev_data = PreviewExtractor.extract_preview(raw_bytes)
             if prev_data:
                 prev_file = destination / f"{stem}_embedded_preview.jpg"
@@ -129,25 +130,26 @@ class ArtefactExtractor:
                             )
                         )
 
-        if include_payload:
-            carved = PayloadCarver.carve_trailing_payload(reader, units, destination)
-            if carved:
-                extracted.append(
-                    ExtractedItem(
-                        item_type="payload",
-                        output_path=carved.output_path,
-                        size_bytes=carved.size,
-                        offset=carved.offset,
-                        sha256=carved.sha256,
-                        details={"payload_type": carved.payload_type},
-                    )
+        if include_payload and carved:
+            extracted.append(
+                ExtractedItem(
+                    item_type="payload",
+                    output_path=carved.output_path,
+                    size_bytes=carved.size,
+                    offset=carved.offset,
+                    sha256=carved.sha256,
+                    details={"payload_type": carved.payload_type},
                 )
+            )
 
         if include_metadata:
             for idx, b in enumerate(blocks):
                 if b.kind == "EMBEDDED_IMAGE":
-                    img_name = Path(b.source_unit).name if b.source_unit else f"image_{idx + 1}.png"
-                    m_file = destination / f"{stem}_{img_name}"
+                    raw_img_name = Path(b.source_unit).name if b.source_unit else f"image_{idx + 1}.png"
+                    img_name = re.sub(r"[^A-Za-z0-9._-]", "_", raw_img_name) or f"image_{idx + 1}.png"
+                    m_file = (destination / f"{stem}_{img_name}").resolve()
+                    if not m_file.is_relative_to(destination):
+                        continue
                     m_file.write_bytes(b.raw_bytes)
                     h = hashlib.sha256(b.raw_bytes).hexdigest()
                     extracted.append(
@@ -163,8 +165,11 @@ class ArtefactExtractor:
                     continue
 
                 if b.kind == "OFFICE_SPEAKER_NOTES":
-                    note_name = Path(b.source_unit).stem if b.source_unit else f"note_{idx + 1}"
-                    n_file = destination / f"{stem}_{note_name}.txt"
+                    raw_note_name = Path(b.source_unit).stem if b.source_unit else f"note_{idx + 1}"
+                    note_name = re.sub(r"[^A-Za-z0-9._-]", "_", raw_note_name) or f"note_{idx + 1}"
+                    n_file = (destination / f"{stem}_{note_name}.txt").resolve()
+                    if not n_file.is_relative_to(destination):
+                        continue
                     n_file.write_bytes(b.raw_bytes)
                     h = hashlib.sha256(b.raw_bytes).hexdigest()
                     extracted.append(
@@ -179,7 +184,7 @@ class ArtefactExtractor:
                     )
                     continue
 
-                kind_clean = b.kind.lower().replace("/", "_")
+                kind_clean = re.sub(r"[^a-z0-9_]", "_", b.kind.lower())
                 ext_map = {
                     "exif": "exif",
                     "tiff_exif": "exif",
@@ -211,10 +216,10 @@ class ArtefactExtractor:
                 )
 
         if crop_coords and "x" in crop_coords and "y" in crop_coords:
-            cx = crop_coords["x"]
-            cy = crop_coords["y"]
-            cw = crop_coords.get("width", 200)
-            ch = crop_coords.get("height", 200)
+            cx = int(crop_coords["x"])
+            cy = int(crop_coords["y"])
+            cw = int(crop_coords.get("width", 200))
+            ch = int(crop_coords.get("height", 200))
             crop_file = destination / f"{stem}_crop_x{cx}_y{cy}_{cw}x{ch}.png"
 
             res = SandboxRunner.run_decode_tasks(
@@ -245,5 +250,4 @@ class ArtefactExtractor:
                         )
                     )
 
-        reader.close()
         return extracted

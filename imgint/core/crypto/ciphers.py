@@ -248,13 +248,19 @@ class AesImageCipher:
             cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
             decryptor = cipher.decryptor()
             full_ciphertext = raw_pixels + tag
+            if len(full_ciphertext) == 0 or len(full_ciphertext) % 16 != 0:
+                raise ValueError("Decryption failed: invalid AES-CBC ciphertext block length.")
             padded = decryptor.update(full_ciphertext) + decryptor.finalize()
             pad_len = padded[-1]
+            if pad_len < 1 or pad_len > 16 or padded[-pad_len:] != bytes([pad_len] * pad_len):
+                raise ValueError("Decryption failed: invalid password or corrupted PKCS#7 padding.")
             dec_bytes = padded[:-pad_len]
         else:
             raise ValueError(f"Unsupported AES mode: {mode}")
 
         w, h = image.size
+        if len(dec_bytes) != h * w * 3:
+            raise ValueError("Decryption failed: decrypted payload size does not match image dimensions.")
         dec_arr = np.frombuffer(dec_bytes, dtype=np.uint8).reshape((h, w, 3))
         return Image.fromarray(dec_arr, mode="RGB")
 
@@ -290,6 +296,12 @@ class AesImageCipher:
         if not data.startswith(MATA_CONTAINER_MAGIC):
             raise ValueError("File is not a valid matazero encrypted container.")
 
+        min_container_size = len(MATA_CONTAINER_MAGIC) + cls.SALT_SIZE + cls.IV_SIZE + 16
+        if len(data) < min_container_size:
+            raise ValueError(
+                f"Truncated or corrupted matazero container ({len(data)} bytes < minimum {min_container_size} bytes)."
+            )
+
         offset = len(MATA_CONTAINER_MAGIC)
         salt = data[offset : offset + cls.SALT_SIZE]
         offset += cls.SALT_SIZE
@@ -317,6 +329,8 @@ class ArnoldCatMapCipher:
         original_size: Optional[Tuple[int, int]] = None,
     ) -> Image.Image:
         """Applies forward or inverse Arnold Cat Map on a square or padded image."""
+        if iterations < 0 or iterations > 1000:
+            raise ValueError(f"Arnold Cat Map iterations ({iterations}) must be between 0 and 1000.")
         img_rgb = image.convert("RGB")
         w, h = img_rgb.size
         dim = max(w, h)

@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import List, Optional
 
+from imgint import __version__
 from imgint.core.model.record import AnalysisRecord
 from imgint.core.repository.base import EvidenceRepository
 from imgint.core.export.sqlite_exporter import SqliteExporter
@@ -27,10 +28,12 @@ class SqliteEvidenceRepository(EvidenceRepository):
 
     def get_by_sha256(self, sha256: str) -> Optional[AnalysisRecord]:
         conn = sqlite3.connect(str(self.db_path))
-        cur = conn.cursor()
-        cur.execute("SELECT sha256, file_name, file_path, mime_type FROM images WHERE sha256 = ?", (sha256,))
-        row = cur.fetchone()
-        conn.close()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT sha256, file_name, file_path, mime_type FROM images WHERE sha256 = ?", (sha256,))
+            row = cur.fetchone()
+        finally:
+            conn.close()
         if not row:
             return None
         return AnalysisRecord(
@@ -38,23 +41,25 @@ class SqliteEvidenceRepository(EvidenceRepository):
             file_size=0,
             mime_type=row[3],
             sha256=row[0],
-            tool_version="2.0.0",
+            tool_version=__version__,
             corpus_version="2026.08",
         )
 
     def list_all(self, limit: int = 100, offset: int = 0) -> List[AnalysisRecord]:
         conn = sqlite3.connect(str(self.db_path))
-        cur = conn.cursor()
-        cur.execute("SELECT sha256, file_name, file_path, mime_type FROM images LIMIT ? OFFSET ?", (limit, offset))
-        rows = cur.fetchall()
-        conn.close()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT sha256, file_name, file_path, mime_type FROM images LIMIT ? OFFSET ?", (limit, offset))
+            rows = cur.fetchall()
+        finally:
+            conn.close()
         return [
             AnalysisRecord(
                 file_path=r[2],
                 file_size=0,
                 mime_type=r[3],
                 sha256=r[0],
-                tool_version="2.0.0",
+                tool_version=__version__,
                 corpus_version="2026.08",
             )
             for r in rows
@@ -62,17 +67,24 @@ class SqliteEvidenceRepository(EvidenceRepository):
 
     def count(self) -> int:
         conn = sqlite3.connect(str(self.db_path))
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM images")
-        val = cur.fetchone()[0]
-        conn.close()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM images")
+            val = cur.fetchone()[0]
+        finally:
+            conn.close()
         return val
 
     def delete(self, sha256: str) -> bool:
         conn = sqlite3.connect(str(self.db_path))
-        cur = conn.cursor()
-        cur.execute("DELETE FROM images WHERE sha256 = ?", (sha256,))
-        deleted = cur.rowcount > 0
-        conn.commit()
-        conn.close()
+        try:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM metadata_fields WHERE image_sha256 = ?", (sha256,))
+            cur.execute("DELETE FROM findings WHERE image_sha256 = ?", (sha256,))
+            cur.execute("DELETE FROM gps_locations WHERE image_sha256 = ?", (sha256,))
+            cur.execute("DELETE FROM images WHERE sha256 = ?", (sha256,))
+            deleted = cur.rowcount > 0
+            conn.commit()
+        finally:
+            conn.close()
         return deleted

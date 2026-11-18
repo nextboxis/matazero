@@ -12,6 +12,18 @@ from imgint.core.standard.base import BlockParser
 class PngNativeParser(BlockParser):
     """Parses PNG text chunks and physical metadata."""
 
+    MAX_DECOMPRESSED_TEXT_SIZE = 1 * 1024 * 1024  # 1 MB cap against zlib bombs
+
+    @classmethod
+    def _safe_zlib_decompress(cls, compressed_data: bytes) -> bytes:
+        decomp = zlib.decompressobj()
+        out = decomp.decompress(compressed_data, cls.MAX_DECOMPRESSED_TEXT_SIZE)
+        if decomp.unconsumed_tail:
+            raise ValueError(
+                f"Decompressed PNG text exceeds maximum safety limit ({cls.MAX_DECOMPRESSED_TEXT_SIZE:,} bytes); possible zlib bomb."
+            )
+        return out + decomp.flush(cls.MAX_DECOMPRESSED_TEXT_SIZE - len(out))
+
     def handles(self, kind: str) -> bool:
         return kind in ("PNG_TEXT", "PNG_NATIVE")
 
@@ -52,7 +64,7 @@ class PngNativeParser(BlockParser):
                 if len(rest) > 1:
                     compressed_data = rest[1:]
                     try:
-                        decompressed = zlib.decompress(compressed_data)
+                        decompressed = self._safe_zlib_decompress(compressed_data)
                         val = decompressed.decode("latin-1", errors="replace").strip()
                         fields.append(Field(standard="PNG", name=f"png:{keyword}", value=val, raw_value=val, value_type="STRING", offset=block.offset, value_offset=val_abs_offset, length=len(compressed_data)))
                         findings.append(
@@ -82,9 +94,10 @@ class PngNativeParser(BlockParser):
                     text_bytes = rest_parts[2] if len(rest_parts) == 3 else (rest_parts[-1] if rest_parts else b"")
                     if comp_flag == 1 and text_bytes:
                         try:
-                            text_bytes = zlib.decompress(text_bytes)
+                            text_bytes = self._safe_zlib_decompress(text_bytes)
                         except Exception as e:
                             diagnostics.append(Diagnostic(level="warning", message=f"iTXt decompression failed: {e}", source="png_native_parser", offset=block.offset))
+                            text_bytes = b""
                     val = text_bytes.decode("utf-8", errors="replace").strip()
                     fields.append(Field(standard="PNG", name=f"png:{keyword}", value=val, raw_value=val, value_type="STRING", offset=block.offset, value_offset=val_abs_offset, length=len(text_bytes)))
                     findings.append(

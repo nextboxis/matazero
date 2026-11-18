@@ -360,19 +360,20 @@ class AnalysisPipeline:
                                 source=analyzer.id,
                             )
                 for skill in skill_reg.get_skills_for_tier(tier, ctx.format_name):
-                    try:
-                        f_list, d_list = skill.analyze(ctx)
-                        for f in f_list:
-                            record.add_finding(f)
-                        record.diagnostics.extend(d_list)
-                    except Exception as e:
-                        record.add_diagnostic(
-                            level="warning",
-                            message=f"Skill {skill.id} failed: {e}",
-                            source=skill.id,
-                        )
+                    if self.scope and self.scope.is_analyzer_permitted(skill.id, tier):
+                        try:
+                            f_list, d_list = skill.analyze(ctx)
+                            for f in f_list:
+                                record.add_finding(f)
+                            record.diagnostics.extend(d_list)
+                        except Exception as e:
+                            record.add_diagnostic(
+                                level="warning",
+                                message=f"Skill {skill.id} failed: {e}",
+                                source=skill.id,
+                            )
 
-        if 7 in self.selected_tiers and self.ollama_model:
+        if 7 in self.selected_tiers and self.ollama_model and (not self.scope or self.scope.is_analyzer_permitted("ollama_vision", 7)):
             try:
                 ai_findings, ai_diagnostics = OllamaVisionAnalyzer.analyze(ctx, self.ollama_model)
                 for f in ai_findings:

@@ -37,6 +37,11 @@ class XmpParser(BlockParser):
             clean_xml = clean_xml[: end_idx + 1]
 
         try:
+            if len(clean_xml) > 2 * 1024 * 1024:
+                raise ValueError("XMP XML payload exceeds 2MB safety cap")
+            upper_head = clean_xml[:4096].upper()
+            if "<!DOCTYPE" in upper_head or "<!ENTITY" in upper_head:
+                raise ValueError("XMP XML contains forbidden DTD or ENTITY declarations (XXE/Billion Laughs protection)")
             parser = ET.XMLParser()
             root = ET.fromstring(clean_xml, parser=parser)
 

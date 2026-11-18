@@ -19,6 +19,17 @@ from imgint.core.source.reader import BoundedReader, SourceBoundsError
 class OfficeContainerReader(ContainerReader):
     """Parses Office OpenXML packages (.pptx, .docx, .xlsx) for embedded images and metadata."""
 
+    MAX_ZIP_ENTRY_BYTES = 16 * 1024 * 1024
+    MAX_XML_ENTRY_BYTES = 2 * 1024 * 1024
+    MAX_TOTAL_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
+    MAX_COMPRESSION_RATIO = 100.0
+
+    @staticmethod
+    def _validate_safe_xml(raw_xml: bytes) -> None:
+        head_upper = raw_xml[:4096].decode("utf-8", errors="ignore").upper()
+        if "<!DOCTYPE" in head_upper or "<!ENTITY" in head_upper:
+            raise ValueError("Unsafe XML DTD/Entity declaration rejected (XXE/Billion Laughs protection)")
+
     def handles(self, format_name: str) -> bool:
         return format_name in ("PPTX", "DOCX", "XLSX", "OFFICE_XML")
 
@@ -29,7 +40,7 @@ class OfficeContainerReader(ContainerReader):
         blocks: List[MetadataBlock] = []
         diagnostics: List[Diagnostic] = []
 
-        raw_data = reader.read_bytes(0, min(reader.size, 100 * 1024 * 1024))
+        raw_data = reader.read_bytes(0, min(reader.size, reader.max_read_size))
 
         try:
             with zipfile.ZipFile(io.BytesIO(raw_data), "r") as zf:
@@ -38,20 +49,48 @@ class OfficeContainerReader(ContainerReader):
                 media_files = []
                 notes_files = []
                 slides_files = []
+                total_uncompressed = 0
+
+                def _safe_zip_read(info: zipfile.ZipInfo, max_bytes: int) -> bytes:
+                    nonlocal total_uncompressed
+                    reader.check_unit_budget()
+                    if ".." in Path(info.filename).parts or info.filename.startswith(("/", "\\")):
+                        raise SourceBoundsError(f"Zip Slip path traversal detected in entry: {info.filename}")
+                    if info.file_size > max_bytes:
+                        raise SourceBoundsError(
+                            f"ZIP entry '{info.filename}' uncompressed size ({info.file_size:,} B) exceeds safety limit ({max_bytes:,} B)."
+                        )
+                    if info.compress_size > 0 and info.file_size > 65536:
+                        ratio = info.file_size / max(1, info.compress_size)
+                        if ratio > self.MAX_COMPRESSION_RATIO:
+                            raise SourceBoundsError(
+                                f"Potential ZIP decompression bomb in '{info.filename}' (compression ratio {ratio:.1f}x > {self.MAX_COMPRESSION_RATIO}x)."
+                            )
+                    if total_uncompressed + info.file_size > self.MAX_TOTAL_UNCOMPRESSED_BYTES:
+                        raise SourceBoundsError(
+                            f"Cumulative uncompressed Office package size exceeds safety cap ({self.MAX_TOTAL_UNCOMPRESSED_BYTES:,} B)."
+                        )
+                    with zf.open(info, "r") as zf_entry:
+                        data = zf_entry.read(max_bytes + 1)
+                    if len(data) > max_bytes:
+                        raise SourceBoundsError(f"ZIP entry '{info.filename}' exceeded {max_bytes:,} B during stream read.")
+                    total_uncompressed += len(data)
+                    return data
 
                 for info in infolist:
                     fname = info.filename
                     if fname.startswith(("ppt/media/", "word/media/", "xl/media/")):
                         media_files.append(info)
-                        img_bytes = zf.read(fname)
+                        img_bytes = _safe_zip_read(info, self.MAX_ZIP_ENTRY_BYTES)
+                        safe_media_name = Path(fname).name
                         units.append(
                             StructuralUnit(
-                                name=f"EMBEDDED_IMAGE:{Path(fname).name}",
+                                name=f"EMBEDDED_IMAGE:{safe_media_name}",
                                 offset=info.header_offset,
                                 length=info.file_size,
                                 data_offset=info.header_offset,
                                 data_length=info.compress_size,
-                                description=f"Embedded presentation image ({Path(fname).name}, {info.file_size:,} bytes)",
+                                description=f"Embedded presentation image ({safe_media_name}, {info.file_size:,} bytes)",
                                 payload=img_bytes[:4096],
                             )
                         )
@@ -61,7 +100,7 @@ class OfficeContainerReader(ContainerReader):
                                 offset=info.header_offset,
                                 length=info.file_size,
                                 raw_bytes=img_bytes,
-                                source_unit=fname,
+                                source_unit=safe_media_name,
                             )
                         )
                     elif fname.startswith("ppt/notesSlides/"):
@@ -81,7 +120,7 @@ class OfficeContainerReader(ContainerReader):
                 )
 
                 if "docProps/core.xml" in zf.namelist():
-                    core_bytes = zf.read("docProps/core.xml")
+                    core_bytes = _safe_zip_read(zf.getinfo("docProps/core.xml"), self.MAX_XML_ENTRY_BYTES)
                     blocks.append(
                         MetadataBlock(
                             kind="OFFICE_CORE_PROPERTIES",
@@ -94,7 +133,7 @@ class OfficeContainerReader(ContainerReader):
                     self._parse_core_properties(core_bytes, units)
 
                 if "docProps/app.xml" in zf.namelist():
-                    app_bytes = zf.read("docProps/app.xml")
+                    app_bytes = _safe_zip_read(zf.getinfo("docProps/app.xml"), self.MAX_XML_ENTRY_BYTES)
                     blocks.append(
                         MetadataBlock(
                             kind="OFFICE_APP_PROPERTIES",
@@ -108,7 +147,8 @@ class OfficeContainerReader(ContainerReader):
 
                 for n_info in notes_files:
                     try:
-                        n_bytes = zf.read(n_info.filename)
+                        n_bytes = _safe_zip_read(n_info, self.MAX_XML_ENTRY_BYTES)
+                        self._validate_safe_xml(n_bytes)
                         root = ET.fromstring(n_bytes)
                         texts = [elem.text for elem in root.iter() if elem.tag.endswith("}t") and elem.text]
                         if texts:
@@ -120,7 +160,7 @@ class OfficeContainerReader(ContainerReader):
                                         offset=n_info.header_offset,
                                         length=len(n_bytes),
                                         raw_bytes=notes_text.encode("utf-8"),
-                                        source_unit=n_info.filename,
+                                        source_unit=Path(n_info.filename).name,
                                     )
                                 )
                     except Exception:
@@ -135,6 +175,7 @@ class OfficeContainerReader(ContainerReader):
 
     def _parse_core_properties(self, raw_xml: bytes, units: List[StructuralUnit]) -> None:
         try:
+            self._validate_safe_xml(raw_xml)
             root = ET.fromstring(raw_xml)
             props = {}
             for child in root:
@@ -157,6 +198,7 @@ class OfficeContainerReader(ContainerReader):
 
     def _parse_app_properties(self, raw_xml: bytes, units: List[StructuralUnit]) -> None:
         try:
+            self._validate_safe_xml(raw_xml)
             root = ET.fromstring(raw_xml)
             props = {}
             for child in root:

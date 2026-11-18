@@ -18,6 +18,27 @@ class SandboxRunner:
     """Spawns an isolated child process to execute decode-requiring analysers."""
 
     DEFAULT_TIMEOUT_SECONDS = 6.0
+    _SENSITIVE_ENV_TOKENS = (
+        "KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "AUTH",
+        "PROXY", "COOKIE", "SESSION", "PRIVATE",
+    )
+
+    @classmethod
+    def _build_sanitized_env(cls, repo_root: str) -> Dict[str, str]:
+        """Constructs a minimal, credential-scrubbed environment for the child worker per ADR-004."""
+        env: Dict[str, str] = {}
+        for k, v in os.environ.items():
+            k_upper = k.upper()
+            if any(tok in k_upper for tok in cls._SENSITIVE_ENV_TOKENS):
+                continue
+            env[k] = v
+
+        existing_pythonpath = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{repo_root}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else repo_root
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        env["PYTHONNOUSERSITE"] = "1"
+        env["NO_PROXY"] = "*"
+        return env
 
     @classmethod
     def run_decode_tasks(
@@ -41,9 +62,7 @@ class SandboxRunner:
         input_json = json.dumps(payload)
 
         repo_root = str(Path(__file__).parent.parent.parent.parent.resolve())
-        env = os.environ.copy()
-        existing_pythonpath = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = f"{repo_root}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else repo_root
+        env = cls._build_sanitized_env(repo_root)
 
         cmd = [sys.executable, "-m", "imgint.core.sandbox.worker"]
 

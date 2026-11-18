@@ -160,7 +160,12 @@ class TimelineReconstructor:
 
     @classmethod
     def _extract_event_from_record(cls, file_path: Path, rec: AnalysisRecord) -> TimelineEvent:
-        f_map = {f.name: f.value for f in rec.fields}
+        f_map: Dict[str, Any] = {}
+        for f in rec.fields:
+            f_map[f.name] = f.value
+            short_name = f.name.split(":")[-1]
+            if short_name not in f_map:
+                f_map[short_name] = f.value
         
         dt_orig_raw = f_map.get("DateTimeOriginal")
         dt_mod_raw = f_map.get("ModifyDate") or f_map.get("DateTime")
@@ -253,15 +258,21 @@ class TimelineReconstructor:
 
     @classmethod
     def _parse_gps_datetime(cls, date_str: str, time_val: Any) -> Optional[datetime]:
+        def _to_int(v: Any) -> int:
+            if isinstance(v, (list, tuple)) and len(v) == 2:
+                num, den = v
+                return int(round(float(num) / float(den))) if float(den) != 0 else int(num)
+            return int(float(v))
+
         try:
             date_clean = date_str.strip().replace("-", ":")
             parts = date_clean.split(":")
             year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
 
             if isinstance(time_val, (list, tuple)) and len(time_val) >= 3:
-                hour = int(time_val[0])
-                minute = int(time_val[1])
-                second = int(time_val[2])
+                hour = _to_int(time_val[0])
+                minute = _to_int(time_val[1])
+                second = _to_int(time_val[2])
             elif isinstance(time_val, str) and ":" in time_val:
                 t_parts = time_val.split(":")
                 hour, minute, second = int(t_parts[0]), int(t_parts[1]), int(float(t_parts[2]))

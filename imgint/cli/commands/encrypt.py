@@ -77,7 +77,12 @@ def encrypt(
         if effective_method == "mulberry32":
             enc_img = Mulberry32Cipher.encrypt(img, password)
         elif effective_method == "chaos":
+            orig_w, orig_h = img.size
             enc_img = ArnoldCatMapCipher.encrypt(img)
+            pnginfo.add_text(
+                "matazero_crypto",
+                json.dumps({"mode": "CHAOS", "original_width": orig_w, "original_height": orig_h}),
+            )
         elif effective_method in ("aes-256-gcm", "aes-256-cbc"):
             aes_mode = "gcm" if "gcm" in effective_method else "cbc"
             enc_img, crypto_meta = AesImageCipher.encrypt_pixels(img, password, mode=aes_mode)
@@ -90,14 +95,15 @@ def encrypt(
         err_console.print(f"[bold red]Encryption failed:[/bold red] {e}")
         sys.exit(ExitCode.GENERIC_ERROR)
 
+    masked_pwd = "*" * min(len(password), 8) + f" ({len(password)} chars)"
     panel_text = Text()
-    panel_text.append(f"Target Image:        ", style="dim")
+    panel_text.append("Target Image:        ", style="dim")
     panel_text.append(f"{target_path.name} ({target_path.stat().st_size:,} bytes)\n", style="bold cyan")
-    panel_text.append(f"Cipher Algorithm:    ", style="dim")
+    panel_text.append("Cipher Algorithm:    ", style="dim")
     panel_text.append(f"{effective_method.upper()}\n", style="white")
-    panel_text.append(f"Passkey Configured:  ", style="dim")
-    panel_text.append(f"'{password}'\n\n", style="bold yellow")
-    panel_text.append(f"Encrypted Output:    ", style="dim")
+    panel_text.append("Passkey Configured:  ", style="dim")
+    panel_text.append(f"{masked_pwd}\n\n", style="bold yellow")
+    panel_text.append("Encrypted Output:    ", style="dim")
     panel_text.append(f"{out_file}\n", style="bold green")
 
     console.print(Panel(panel_text, title="[bold]matazero Image Encryption Complete[/bold]", border_style="green"))

@@ -72,8 +72,8 @@ def scan(
             try:
                 rec = pipeline.analyze_file(p)
                 if carve and rec.structural_units:
-                    reader = BoundedReader(p)
-                    PayloadCarver.carve_trailing_payload(reader, rec.structural_units, "./evidence_store/carved")
+                    with BoundedReader(p) as reader:
+                        PayloadCarver.carve_trailing_payload(reader, rec.structural_units, "./evidence_store/carved")
                 return rec
             except Exception:
                 return None

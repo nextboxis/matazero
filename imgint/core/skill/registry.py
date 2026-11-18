@@ -87,8 +87,11 @@ class SkillRegistry:
         rel_file = entry_parts[0]
         class_name = entry_parts[1] if len(entry_parts) > 1 else "CustomSkill"
 
-        py_file = skill_dir / rel_file
-        if not py_file.exists():
+        resolved_dir = skill_dir.resolve()
+        py_file = (resolved_dir / rel_file).resolve()
+        if not py_file.is_relative_to(resolved_dir) or py_file.suffix.lower() != ".py":
+            raise ValueError(f"Skill entry_point '{rel_file}' attempts path traversal outside '{resolved_dir}'")
+        if not py_file.exists() or not py_file.is_file():
             return None
 
         spec = importlib.util.spec_from_file_location(f"matazero_skill_{manifest.id}", py_file)

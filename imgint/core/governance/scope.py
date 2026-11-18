@@ -36,8 +36,7 @@ class AuthorizationScope:
     is_self_audit: bool = False
 
     def __post_init__(self) -> None:
-        if not self.is_self_audit:
-            enforce_refusals(set(self.permitted_operations))
+        enforce_refusals(set(self.permitted_operations))
 
     @property
     def is_expired(self) -> bool:
@@ -128,6 +127,12 @@ class AuthorizationScope:
         if missing:
             raise ScopeValidationError(f"Invalid scope: missing required fields {missing}")
 
+        if data.get("is_self_audit", False):
+            raise ScopeValidationError(
+                "External scope files cannot declare 'is_self_audit: true'. "
+                "Self-audit scopes must only be created in-memory via --self-audit."
+            )
+
         scope = cls(
             case_id=data["case_id"],
             purpose=data["purpose"],
@@ -140,16 +145,17 @@ class AuthorizationScope:
             disabled_analyzers=data.get("disabled_analyzers", []),
             signature=data.get("signature"),
             scope_hash=data.get("scope_hash"),
-            is_self_audit=data.get("is_self_audit", False),
+            is_self_audit=False,
         )
 
         expected_hash = scope.compute_canonical_hash()
-        if scope.scope_hash and scope.scope_hash != expected_hash:
+        if scope.scope_hash and not hmac.compare_digest(str(scope.scope_hash), expected_hash):
             raise ScopeValidationError("Scope integrity check failed: scope_hash does not match content.")
 
-        if secret_key:
-            expected_sig = scope.compute_canonical_hash(secret_key=secret_key)
-            if scope.signature != expected_sig:
+        effective_secret = secret_key or os.environ.get("IMGINT_SCOPE_SECRET")
+        if effective_secret:
+            expected_sig = scope.compute_canonical_hash(secret_key=effective_secret)
+            if not scope.signature or not hmac.compare_digest(str(scope.signature), expected_sig):
                 raise ScopeValidationError("Scope signature verification failed: invalid signature.")
 
         if scope.is_expired:

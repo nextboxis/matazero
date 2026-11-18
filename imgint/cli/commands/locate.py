@@ -111,9 +111,16 @@ def locate(
             alt_finding = next((f for f in rec.findings if f.name == "gps_altitude_claimed"), None)
             alt_m = alt_finding.value.get("altitude_meters") if alt_finding else None
 
-            make_f = next((f.value for f in rec.fields if f.name == "Make"), None)
-            model_f = next((f.value for f in rec.fields if f.name == "Model"), None)
-            date_f = next((f.value for f in rec.fields if f.name in ("DateTimeOriginal", "DateTime")), None)
+            f_map: Dict[str, Any] = {}
+            for fld in rec.fields:
+                f_map[fld.name] = fld.value
+                short_k = fld.name.split(":")[-1]
+                if short_k not in f_map:
+                    f_map[short_k] = fld.value
+
+            make_f = f_map.get("Make")
+            model_f = f_map.get("Model")
+            date_f = f_map.get("DateTimeOriginal") or f_map.get("DateTime")
 
             offline_geo = GeoLocator.reverse_geocode_offline(lat, lon) or {}
             online_geo = GeoLocator.reverse_geocode_online(lat, lon) if allow_network else None
@@ -161,15 +168,15 @@ def locate(
                 if cone_finding and isinstance(cone_finding.value, dict):
                     point_record["optical_viewing_cone"] = cone_finding.value
                 else:
-                    img_dir_f = next((f.value for f in rec.fields if f.name == "GPSImgDirection"), None)
+                    img_dir_f = f_map.get("GPSImgDirection")
                     if img_dir_f is not None:
                         gta = GeoTimeAnalyzer()
                         img_dir_v = gta._convert_rational_to_float(img_dir_f)
-                        fl_val = next((f.value for f in rec.fields if f.name == "FocalLength"), None)
-                        fl35_val = next((f.value for f in rec.fields if f.name == "FocalLengthIn35mmFilm"), None)
+                        fl_val = f_map.get("FocalLength")
+                        fl35_val = f_map.get("FocalLengthIn35mmFilm")
                         f_mm_v = gta._convert_rational_to_float(fl_val) if fl_val else None
                         f_35_v = gta._convert_rational_to_float(fl35_val) if fl35_val else None
-                        dir_ref = str(next((f.value for f in rec.fields if f.name == "GPSImgDirectionRef"), "T") or "T")
+                        dir_ref = str(f_map.get("GPSImgDirectionRef") or "T")
                         from imgint.core.geo.optical import OpticalRayCaster
                         cone = OpticalRayCaster.calculate_viewing_cone(
                             lat=lat,

@@ -95,8 +95,17 @@ class OfficePropertiesParser(BlockParser):
 
         return fields, findings, diagnostics
 
+    @staticmethod
+    def _validate_safe_xml(raw_bytes: bytes) -> None:
+        if len(raw_bytes) > 2 * 1024 * 1024:
+            raise ValueError("Office XML payload exceeds 2MB safety cap")
+        head_upper = raw_bytes[:4096].decode("utf-8", errors="ignore").upper()
+        if "<!DOCTYPE" in head_upper or "<!ENTITY" in head_upper:
+            raise ValueError("Office XML contains forbidden DTD or ENTITY declarations")
+
     def _parse_core_xml(self, block: MetadataBlock, fields: List[Field], findings: List[Finding]) -> None:
         try:
+            self._validate_safe_xml(block.raw_bytes)
             root = ET.fromstring(block.raw_bytes)
             tag_map = {
                 "creator": ("Author", "Author / Creator"),
@@ -145,6 +154,7 @@ class OfficePropertiesParser(BlockParser):
 
     def _parse_app_xml(self, block: MetadataBlock, fields: List[Field], findings: List[Finding]) -> None:
         try:
+            self._validate_safe_xml(block.raw_bytes)
             root = ET.fromstring(block.raw_bytes)
             tag_map = {
                 "Application": "Application",

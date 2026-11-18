@@ -115,8 +115,8 @@ class NaturalEarthDB:
     _db_path: Optional[str] = None
 
     DEFAULT_PATHS = [
-        r"J:\PROGRAM\mata\sqlite\natural_earth_vector.sqlite\packages\natural_earth_vector.sqlite",
-        r"J:\PROGRAM\mata\sqlite\natural_earth_vector.sqlite",
+        r"J:\Projects\06_Mata\sqlite\natural_earth_vector.sqlite\packages\natural_earth_vector.sqlite",
+        r"J:\Projects\06_Mata\sqlite\natural_earth_vector.sqlite",
         "sqlite/natural_earth_vector.sqlite/packages/natural_earth_vector.sqlite",
         "sqlite/natural_earth_vector.sqlite",
     ]
@@ -124,7 +124,7 @@ class NaturalEarthDB:
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = self._resolve_db_path(db_path)
         self._conn: Optional[sqlite3.Connection] = None
-        if self.db_path and os.path.exists(self.db_path):
+        if self.db_path and os.path.exists(self.db_path) and os.path.isfile(self.db_path):
             try:
                 self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
             except Exception:
@@ -141,20 +141,20 @@ class NaturalEarthDB:
     @classmethod
     def _resolve_db_path(cls, custom_path: Optional[str] = None) -> Optional[str]:
         """Locate the Natural Earth SQLite database on disk."""
-        if custom_path and os.path.exists(custom_path):
+        if custom_path and os.path.isfile(custom_path):
             return custom_path
 
         env_path = os.environ.get("NATURAL_EARTH_SQLITE")
-        if env_path and os.path.exists(env_path):
+        if env_path and os.path.isfile(env_path):
             return env_path
 
-        base_dir = Path(__file__).resolve().parents[4]
+        base_dir = Path(__file__).resolve().parents[3]
         for rel in cls.DEFAULT_PATHS:
             p = Path(rel)
-            if p.is_absolute() and p.exists():
+            if p.is_absolute() and p.is_file():
                 return str(p)
             candidate = base_dir / rel
-            if candidate.exists():
+            if candidate.is_file():
                 return str(candidate)
 
         return None

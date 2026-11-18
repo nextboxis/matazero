@@ -21,6 +21,8 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
         import imagehash
         import numpy as np
 
+        Image.MAX_IMAGE_PIXELS = 64_000_000
+
         img = None
         if file_path and os.path.exists(file_path):
             img = Image.open(file_path)
@@ -236,8 +238,14 @@ def process_decode_tasks(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
                 cropped_img = img_rgb.crop((box_x1, box_y1, box_x2, box_y2))
                 if crop_out:
-                    Path(crop_out).parent.mkdir(parents=True, exist_ok=True)
-                    cropped_img.save(crop_out)
+                    raw_crop_str = str(crop_out)
+                    if ".." in Path(raw_crop_str).parts:
+                        raise ValueError("Path traversal sequence '..' is not permitted in crop_out_path")
+                    out_p = Path(raw_crop_str).resolve()
+                    if out_p.suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp", ".bmp"):
+                        raise ValueError(f"Unsupported crop output extension: {out_p.suffix}")
+                    out_p.parent.mkdir(parents=True, exist_ok=True)
+                    cropped_img.save(out_p)
 
                 results["tasks"]["crop"] = {
                     "x": x,
