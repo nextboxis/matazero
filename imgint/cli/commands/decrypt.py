@@ -88,8 +88,12 @@ def decrypt(
     if hasattr(img, "text") and "matazero_crypto" in img.text:
         try:
             crypto_meta = json.loads(img.text["matazero_crypto"])
+            meta_mode = str(crypto_meta.get("mode", "gcm")).lower()
             if effective_method == "auto":
-                effective_method = f"aes-256-{crypto_meta.get('mode', 'gcm').lower()}"
+                if meta_mode == "chaos":
+                    effective_method = "chaos"
+                else:
+                    effective_method = f"aes-256-{meta_mode}"
         except Exception:
             pass
 
@@ -127,7 +131,7 @@ def decrypt(
                 console.print("[yellow][!] Dictionary recovery found no alternate candidates; proceeding with provided parameters.[/yellow]")
 
     try:
-        if effective_method in ("aes-256-gcm", "aes-256-cbc") or crypto_meta is not None:
+        if effective_method in ("aes-256-gcm", "aes-256-cbc") or (crypto_meta is not None and effective_method != "chaos"):
             if not used_password:
                 err_console.print("[bold red]Error:[/bold red] AES pixel decryption requires --password (-p).")
                 sys.exit(ExitCode.USAGE_ERROR)
@@ -138,7 +142,10 @@ def decrypt(
         elif effective_method == "mulberry32":
             dec_img = Mulberry32Cipher.decrypt(img, key=used_password, seed=parsed_seed)
         elif effective_method == "chaos":
-            dec_img = ArnoldCatMapCipher.decrypt(img)
+            orig_sz = None
+            if crypto_meta and "original_width" in crypto_meta and "original_height" in crypto_meta:
+                orig_sz = (int(crypto_meta["original_width"]), int(crypto_meta["original_height"]))
+            dec_img = ArnoldCatMapCipher.decrypt(img, original_size=orig_sz)
         else:
             dec_img = Mulberry32Cipher.decrypt(img, key=used_password, seed=parsed_seed)
 
