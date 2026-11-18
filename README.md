@@ -12,8 +12,8 @@
 # matazero
 ### Evidence-Grade Image Intelligence & Forensic Toolkit for OSINT
 
-[![Release](https://img.shields.io/badge/release-v2.2.0-blue.svg?style=flat-square)](https://github.com/nextboxis/matazero/releases)
-[![Tests](https://img.shields.io/badge/tests-47%20passed-success.svg?style=flat-square&logo=pytest)](tests/)
+[![Release](https://img.shields.io/badge/release-v2.3.0-blue.svg?style=flat-square)](https://github.com/nextboxis/matazero/releases)
+[![Tests](https://img.shields.io/badge/tests-64%20passed-success.svg?style=flat-square&logo=pytest)](tests/)
 [![Container](https://img.shields.io/badge/docker-ghcr.io-blueviolet.svg?style=flat-square&logo=docker)](https://github.com/users/nextboxis/packages?repo_name=matazero)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-informational.svg?style=flat-square&logo=python)](https://python.org)
 [![Air-Gapped OPSEC](https://img.shields.io/badge/opsec-100%25%20offline-success.svg?style=flat-square)](docs/SECURITY.md)
@@ -45,14 +45,15 @@
 * **100% Offline & Private**: Zero telemetry. Zero remote cloud calls. Local offline solar chronolocation, local reverse geocoding, and local vision model interrogation (via Ollama).
 * **Forensic Chain of Custody**: Every finding carries verifiable provenance and confidence ratings. Case operations produce tamper-evident, append-only **SHA-256 hash-chained audit trails**.
 
-### 🌟 What's New in v2.2.0
+### 🌟 What's New in v2.3.0
 
-* ⚡ **Ultra-Responsive CLI Startup**: Replaced eager submodule imports with dynamic lazy loaders, eliminating module collision `RuntimeWarning` notices and cutting CLI startup latency.
-* 🛡️ **High-Level Military-Grade AES-256 Ciphers**: Native AES-256-GCM authenticated pixel encryption and AES-256-CBC with auto-injected `matazero_crypto` PNG metadata chunks for seamless 1-command decryption.
-* 🔎 **Accurate Triage Verdicts**: Fixed verdict confidence mapping in `scan` and `case_dossier.html`, correctly distinguishing Authentic Camera Captures, Tampered Images, and Encrypted Carriers.
-* 🌐 **Cross-Platform Wildcard & Glob Expansion**: Unified path resolution supporting recursive directory walks and quoted globs (`*.jpg`, `cases/**/IMG*`) identically across Linux, macOS, CMD, and PowerShell.
-* 🛑 **Graceful SIGINT Handling**: Clean user abort handling on Ctrl+C (Exit code 130) without unhandled Python tracebacks.
-* 🧪 **Comprehensive Test Suite**: Restored and validated complete unit and regression test suite (47 passed, 2 skipped).
+* 🔐 **Ethical Hacker Security Hardening**:
+  * **Scope Privilege-Escalation & Timing Defense**: Blocked external `is_self_audit: true` scope injection, enforced refusal checks across all modes, and upgraded scope hash/HMAC verification to constant-time `hmac.compare_digest`.
+  * **Zero-Credential Subprocess Sandbox**: Scrubbed API keys, tokens, secrets, passwords, and proxy variables from child decode workers (`PYTHONNOUSERSITE=1`, `NO_PROXY=*`), added a 64 MP decompression bomb cap, and blocked `crop_out_path` path traversal.
+  * **Decompression Bomb & XXE Defense**: Added streaming 1 MB zlib caps on PNG `zTXt`/`iTXt` chunks, per-entry and cumulative compression ratio guards on Office OpenXML containers, and DTD/`<!ENTITY` rejection across XMP and Office XML parsers.
+  * **XSS, SSRF & Skill Path-Traversal Protection**: Full HTML/JS/CDATA escaping across HTML dossiers, Leaflet maps, KML, and GPX exports; strict loopback-only HTTP/HTTPS validation in `OllamaClient`; `ipaddress` validation in online IP correlation; and directory containment checks in `SkillRegistry`.
+* 🗺️ **Natural Earth SQLite Auto-Discovery & Sub-IFD Resolution**: Fixed repository root path resolution for the 849 MB Natural Earth Vector SQLite database and normalized `ExifSubIFD:` / `GPSInfo:` tag resolution across `timeline`, `cluster`, `locate`, and `export`.
+* ⚡ **Ultra-Responsive CLI & Military-Grade AES-256 Ciphers**: Native AES-256-GCM/CBC authenticated pixel encryption, non-square Arnold Cat Map (`chaos`) dimension preservation, masked passkey output, and 100% passing test suite (64 passed, 0 skipped).
 
 ```
                            ┌───────────────────────────────┐
