@@ -1,6 +1,7 @@
 """Forensic Geolocation Data Exporter supporting GeoJSON, Leaflet HTML Maps, and GPX Tracks."""
 
 from __future__ import annotations
+import html as _html
 import json
 import logging
 from datetime import datetime, timezone
@@ -93,7 +94,7 @@ class GeoExporter:
         geojson_doc = {
             "type": "FeatureCollection",
             "metadata": {
-                "generator": "matazero forensic geolocation engine v2.0",
+                "generator": "matazero forensic geolocation engine v2.3.0",
                 "generated_utc": datetime.now(timezone.utc).isoformat(),
                 "title": title,
                 "feature_count": len(points),
@@ -140,7 +141,7 @@ class GeoExporter:
                 from imgint.core.geo.locator import GeoLocator
                 gf_feats = GeoLocator.load_geojson_features(geofence_geojson)
                 if gf_feats:
-                    geofence_data_json = json.dumps({"type": "FeatureCollection", "features": gf_feats})
+                    geofence_data_json = json.dumps({"type": "FeatureCollection", "features": gf_feats}).replace("</", r"<\/")
             except Exception as e:
                 logger.warning("Failed to serialize geofence features for Leaflet export: %s", e)
 
@@ -155,14 +156,15 @@ class GeoExporter:
             center_lon = sum(p["lon"] for p in valid_points) / len(valid_points)
             zoom = 10
 
-        points_json = json.dumps(valid_points)
+        points_json = json.dumps(valid_points).replace("</", r"<\/")
+        safe_title = _html.escape(str(title))
 
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
+    <title>{safe_title}</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -243,7 +245,7 @@ class GeoExporter:
 <body>
     <header>
         <div class="brand">
-            <h1>🌐 {title}</h1>
+            <h1>🌐 {safe_title}</h1>
             <span>EVIDENCE GRADE</span>
         </div>
         <div class="stats">
@@ -261,6 +263,15 @@ class GeoExporter:
     <script>
         const points = {points_json};
         const geofenceGeoJson = {geofence_data_json};
+        function esc(val) {{
+            if (val === undefined || val === null) return '';
+            return String(val)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }}
         
         // Tile Layers
         const osm = L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
@@ -302,18 +313,18 @@ class GeoExporter:
             const ipCorr = p.ip_correlation || {{}};
 
             const popupContent = `
-                <div class="popup-title">#${{p.idx}} ${{p.file_name || 'Evidence Asset'}}</div>
+                <div class="popup-title">#${{esc(p.idx)}} ${{esc(p.file_name || 'Evidence Asset')}}</div>
                 <div class="popup-field">Coordinates: <b>${{p.lat.toFixed(6)}}°, ${{p.lon.toFixed(6)}}°</b></div>
-                ${{p.closest_city ? `<div class="popup-field">Nearest City: <b>${{p.closest_city}}, ${{p.country || ''}}</b></div>` : ''}}
-                ${{facSummary && facSummary !== 'No major aviation or maritime transit hub within immediate proximity.' ? `<div class="popup-field">Facility Context: <b style="color: #58a6ff;">${{facSummary}}</b></div>` : ''}}
-                ${{solar.solar_elevation_degrees !== undefined ? `<div class="popup-field">Solar Chronolocation: <b>${{solar.day_phase || 'Solar'}} (El: ${{solar.solar_elevation_degrees}}°, Az: ${{solar.solar_azimuth_degrees}}°)</b></div>` : ''}}
-                ${{ipCorr.correlation_verdict ? `<div class="popup-field">IP Correlation: <b style="${{ipCorr.is_suspicious ? 'color: #ff7b72;' : 'color: #3fb950;'}}">${{ipCorr.correlation_verdict}} (Δ ${{ipCorr.distance_km}}km)</b></div>` : ''}}
-                ${{p.timestamp ? `<div class="popup-field">Capture Time: <b>${{p.timestamp}}</b></div>` : ''}}
-                ${{p.altitude_m !== undefined && p.altitude_m !== null ? `<div class="popup-field">Altitude: <b>${{p.altitude_m}} m</b></div>` : ''}}
-                ${{p.timezone ? `<div class="popup-field">Timezone: <b>${{p.timezone}}</b></div>` : ''}}
+                ${{p.closest_city ? `<div class="popup-field">Nearest City: <b>${{esc(p.closest_city)}}, ${{esc(p.country || '')}}</b></div>` : ''}}
+                ${{facSummary && facSummary !== 'No major aviation or maritime transit hub within immediate proximity.' ? `<div class="popup-field">Facility Context: <b style="color: #58a6ff;">${{esc(facSummary)}}</b></div>` : ''}}
+                ${{solar.solar_elevation_degrees !== undefined ? `<div class="popup-field">Solar Chronolocation: <b>${{esc(solar.day_phase || 'Solar')}} (El: ${{esc(solar.solar_elevation_degrees)}}°, Az: ${{esc(solar.solar_azimuth_degrees)}}°)</b></div>` : ''}}
+                ${{ipCorr.correlation_verdict ? `<div class="popup-field">IP Correlation: <b style="${{ipCorr.is_suspicious ? 'color: #ff7b72;' : 'color: #3fb950;'}}">${{esc(ipCorr.correlation_verdict)}} (Δ ${{esc(ipCorr.distance_km)}}km)</b></div>` : ''}}
+                ${{p.timestamp ? `<div class="popup-field">Capture Time: <b>${{esc(p.timestamp)}}</b></div>` : ''}}
+                ${{p.altitude_m !== undefined && p.altitude_m !== null ? `<div class="popup-field">Altitude: <b>${{esc(p.altitude_m)}} m</b></div>` : ''}}
+                ${{p.timezone ? `<div class="popup-field">Timezone: <b>${{esc(p.timezone)}}</b></div>` : ''}}
                 <div class="popup-links">
-                    <a href="https://www.google.com/maps?q=${{p.lat}},${{p.lon}}" target="_blank">Google Maps</a>
-                    <a href="https://www.openstreetmap.org/?mlat=${{p.lat}}&mlon=${{p.lon}}#map=16/${{p.lat}}/${{p.lon}}" target="_blank">OSM</a>
+                    <a href="https://www.google.com/maps?q=${{p.lat}},${{p.lon}}" target="_blank" rel="noopener noreferrer">Google Maps</a>
+                    <a href="https://www.openstreetmap.org/?mlat=${{p.lat}}&mlon=${{p.lon}}#map=16/${{p.lat}}/${{p.lon}}" target="_blank" rel="noopener noreferrer">OSM</a>
                 </div>
             `;
 
@@ -325,8 +336,8 @@ class GeoExporter:
             card.className = 'point-card';
             card.innerHTML = `
                 <div class="card-header">
-                    <strong>#${{p.idx}} ${{p.file_name || 'Asset'}}</strong>
-                    <span class="badge">${{p.country_code || 'GPS'}}</span>
+                    <strong>#${{esc(p.idx)}} ${{esc(p.file_name || 'Asset')}}</strong>
+                    <span class="badge">${{esc(p.country_code || 'GPS')}}</span>
                 </div>
                 <div class="card-row">
                     <span>Coordinates:</span>
@@ -335,22 +346,22 @@ class GeoExporter:
                 ${{p.closest_city ? `
                 <div class="card-row">
                     <span>Location:</span>
-                    <span>${{p.closest_city}}</span>
+                    <span>${{esc(p.closest_city)}}</span>
                 </div>` : ''}}
                 ${{facSummary && facSummary !== 'No major aviation or maritime transit hub within immediate proximity.' ? `
                 <div class="card-row">
                     <span>Facility:</span>
-                    <span style="color: #58a6ff; font-size: 0.75rem; text-align: right; max-width: 220px;">${{facSummary}}</span>
+                    <span style="color: #58a6ff; font-size: 0.75rem; text-align: right; max-width: 220px;">${{esc(facSummary)}}</span>
                 </div>` : ''}}
                 ${{solar.day_phase ? `
                 <div class="card-row">
                     <span>Solar:</span>
-                    <span style="color: #d2a8ff;">${{solar.day_phase}} (${{solar.solar_elevation_degrees}}°)</span>
+                    <span style="color: #d2a8ff;">${{esc(solar.day_phase)}} (${{esc(solar.solar_elevation_degrees)}}°)</span>
                 </div>` : ''}}
                 ${{p.timestamp ? `
                 <div class="card-row">
                     <span>Timestamp:</span>
-                    <span>${{p.timestamp}}</span>
+                    <span>${{esc(p.timestamp)}}</span>
                 </div>` : ''}}
             `;
 
@@ -405,7 +416,7 @@ class GeoExporter:
                 }},
                 onEachFeature: function(feature, layer) {{
                     if (feature.properties && feature.properties.name) {{
-                        layer.bindPopup('<b>Geofence:</b> ' + feature.properties.name + '<br>' + (feature.properties.description || ''));
+                        layer.bindPopup('<b>Geofence:</b> ' + esc(feature.properties.name) + '<br>' + esc(feature.properties.description || ''));
                     }}
                 }}
             }}).addTo(map);
@@ -419,11 +430,12 @@ class GeoExporter:
     @staticmethod
     def to_kml(points: List[Dict[str, Any]], doc_name: str = "matazero 3D Geospatial Intelligence Dossier") -> str:
         """Generates standard OpenGIS KML 2.2 XML with 3D camera placemarks, heading, and trajectory tracks."""
+        safe_doc_name = _html.escape(str(doc_name))
         lines = [
             '<?xml version="1.0" encoding="UTF-8"?>',
             '<kml xmlns="http://www.opengis.net/kml/2.2">',
             '  <Document>',
-            f'    <name>{doc_name}</name>',
+            f'    <name>{safe_doc_name}</name>',
             '    <Style id="cameraPin">',
             '      <IconStyle>',
             '        <color>ff00ffff</color>',
@@ -445,34 +457,37 @@ class GeoExporter:
             lon = pt.get("longitude") or pt.get("lon") or pt.get("x")
             if lat is None or lon is None:
                 continue
-            if abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001:
+            lat = float(lat)
+            lon = float(lon)
+            if abs(lat) < 0.0001 and abs(lon) < 0.0001:
                 continue
 
-            alt = pt.get("altitude_m", 0.0) or 0.0
-            name = pt.get("file_name", f"Evidence #{idx + 1}")
-            time_str = pt.get("timestamp", "")
-            city = pt.get("closest_city", "Unknown")
-            country = pt.get("country", "")
-            fac = pt.get("facility_proximity", {}).get("summary", "")
+            alt = float(pt.get("altitude_m", 0.0) or 0.0)
+            name = _html.escape(str(pt.get("file_name", f"Evidence #{idx + 1}")))
+            time_str = _html.escape(str(pt.get("timestamp", "")))
+            city = _html.escape(str(pt.get("closest_city", "Unknown")))
+            country = _html.escape(str(pt.get("country", "")))
+            fac = _html.escape(str(pt.get("facility_proximity", {}).get("summary", "")))
             solar = pt.get("solar_chronolocation", {})
             cone = pt.get("optical_viewing_cone", {})
-            heading = cone.get("heading_deg", 0.0) if isinstance(cone, dict) else 0.0
+            heading = float(cone.get("heading_deg", 0.0)) if isinstance(cone, dict) and cone.get("heading_deg") is not None else 0.0
 
             track_coords.append(f"{lon:.6f},{lat:.6f},{alt:.1f}")
 
-            desc = f"<![CDATA["
-            desc += f"<h3>{name}</h3>"
-            desc += f"<p><b>Coordinates:</b> {lat:.6f}°, {lon:.6f}°</p>"
-            desc += f"<p><b>Location:</b> {city}, {country}</p>"
+            desc_body = f"<h3>{name}</h3>"
+            desc_body += f"<p><b>Coordinates:</b> {lat:.6f}°, {lon:.6f}°</p>"
+            desc_body += f"<p><b>Location:</b> {city}, {country}</p>"
             if time_str:
-                desc += f"<p><b>Capture Time:</b> {time_str}</p>"
+                desc_body += f"<p><b>Capture Time:</b> {time_str}</p>"
             if alt:
-                desc += f"<p><b>Altitude:</b> {alt:.1f} m</p>"
+                desc_body += f"<p><b>Altitude:</b> {alt:.1f} m</p>"
             if fac:
-                desc += f"<p><b>Facilities:</b> {fac}</p>"
-            if solar:
-                desc += f"<p><b>Solar:</b> {solar.get('day_phase', '')} (El: {solar.get('solar_elevation_degrees', '')}°)</p>"
-            desc += f"]]>"
+                desc_body += f"<p><b>Facilities:</b> {fac}</p>"
+            if solar and isinstance(solar, dict):
+                s_phase = _html.escape(str(solar.get("day_phase", "")))
+                s_el = _html.escape(str(solar.get("solar_elevation_degrees", "")))
+                desc_body += f"<p><b>Solar:</b> {s_phase} (El: {s_el}°)</p>"
+            desc = f"<![CDATA[{desc_body.replace(']]>', ']]&gt;')}]]>"
 
             lines.extend([
                 '    <Placemark>',
@@ -535,15 +550,16 @@ class GeoExporter:
     def to_gpx(points: List[Dict[str, Any]], track_name: str = "matazero Image Evidence Track") -> str:
         """Generates standard GPS Exchange Format (GPX 1.1) XML."""
         now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        safe_track_name = _html.escape(str(track_name))
         lines = [
             '<?xml version="1.0" encoding="UTF-8"?>',
-            '<gpx version="1.1" creator="matazero forensic toolkit v2.0" xmlns="http://www.topografix.com/GPX/1/1">',
+            '<gpx version="1.1" creator="matazero forensic toolkit v2.3.0" xmlns="http://www.topografix.com/GPX/1/1">',
             "  <metadata>",
-            f"    <name>{track_name}</name>",
+            f"    <name>{safe_track_name}</name>",
             f"    <time>{now_utc}</time>",
             "  </metadata>",
             "  <trk>",
-            f"    <name>{track_name}</name>",
+            f"    <name>{safe_track_name}</name>",
             "    <trkseg>",
         ]
 
@@ -553,16 +569,18 @@ class GeoExporter:
             if lat is None or lon is None:
                 continue
 
-            if abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001:
+            lat = float(lat)
+            lon = float(lon)
+            if abs(lat) < 0.0001 and abs(lon) < 0.0001:
                 continue
 
             ele = pt.get("altitude_m")
-            time_s = pt.get("timestamp")
-            name = pt.get("file_name", "Asset")
+            time_s = _html.escape(str(pt.get("timestamp"))) if pt.get("timestamp") else None
+            name = _html.escape(str(pt.get("file_name", "Asset")))
 
             lines.append(f'      <trkpt lat="{lat:.6f}" lon="{lon:.6f}">')
             if ele is not None:
-                lines.append(f"        <ele>{ele:.1f}</ele>")
+                lines.append(f"        <ele>{float(ele):.1f}</ele>")
             if time_s:
                 lines.append(f"        <time>{time_s}</time>")
             lines.append(f"        <name>{name}</name>")
