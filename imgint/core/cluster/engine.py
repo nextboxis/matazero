@@ -123,7 +123,12 @@ class ClusterEngine:
 
     @classmethod
     def _extract_clustered_item(cls, path: Path, rec: AnalysisRecord) -> ClusteredItem:
-        f_map = {f.name: f.value for f in rec.fields}
+        f_map: Dict[str, Any] = {}
+        for f in rec.fields:
+            f_map[f.name] = f.value
+            short_name = f.name.split(":")[-1]
+            if short_name not in f_map:
+                f_map[short_name] = f.value
         make = str(f_map.get("Make")) if f_map.get("Make") else None
         model = str(f_map.get("Model")) if f_map.get("Model") else None
         serial = str(f_map.get("BodySerialNumber") or f_map.get("SerialNumber") or "")
@@ -132,7 +137,7 @@ class ClusterEngine:
         for u in rec.structural_units:
             if u.name == "DQT" and u.payload:
                 dqt_bytes.extend(u.payload)
-        dqt_hash = hashlib.md5(dqt_bytes).hexdigest()[:8] if dqt_bytes else "no_dqt"
+        dqt_hash = hashlib.sha256(dqt_bytes).hexdigest()[:8] if dqt_bytes else "no_dqt"
 
         coords = None
         gps_finding = next((f for f in rec.findings if f.name in ("gps_coordinates_claimed", "gps_location_fix")), None)
