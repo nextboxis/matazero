@@ -5,12 +5,14 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import stat
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from imgint import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +72,8 @@ class EvidenceStore:
 
         file_hash = self.compute_sha256(src)
         file_size = src.stat().st_size
-        ext = src.suffix or ".bin"
+        clean_suffix = re.sub(r"[^A-Za-z0-9.]", "", src.suffix or "")[:10]
+        ext = clean_suffix if (clean_suffix.startswith(".") and len(clean_suffix) > 1) else ".bin"
         now_utc = datetime.now(timezone.utc).isoformat()
 
         dest_original = self.originals_dir / f"{file_hash}{ext}"
@@ -82,6 +85,13 @@ class EvidenceStore:
                 dest_original.chmod(stat.S_IREAD | stat.S_IRGRP | stat.S_IROTH)
             except Exception as e:
                 logger.debug("Could not set read-only permissions on %s: %s", dest_original, e)
+        else:
+            existing_hash = self.compute_sha256(dest_original)
+            if existing_hash != file_hash:
+                raise EvidenceCustodyError(
+                    f"CRITICAL CUSTODY BREACH: Existing stored original {dest_original} was modified! "
+                    f"Expected hash {file_hash}, but found {existing_hash}."
+                )
 
         if dest_working.exists():
             try:
@@ -124,7 +134,7 @@ class EvidenceStore:
 
     def _save_manifest(self) -> None:
         manifest_data = {
-            "version": "2.0.0",
+            "version": __version__,
             "updated_utc": datetime.now(timezone.utc).isoformat(),
             "items": [
                 {
