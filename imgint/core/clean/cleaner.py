@@ -72,6 +72,12 @@ class MetadataCleaner:
                 out.extend(b"\xFF\xD9")
                 break
 
+            if marker == 0x00 or (0xD0 <= marker <= 0xD7) or marker == 0x01:
+                if marker != 0x00:
+                    out.extend(data[offset : offset + 2])
+                offset += 2
+                continue
+
             if marker == 0xDA:
                 eoi_idx = data.find(b"\xFF\xD9", offset)
                 if eoi_idx != -1:
@@ -84,7 +90,11 @@ class MetadataCleaner:
                 break
 
             seg_len = struct.unpack(">H", data[offset + 2 : offset + 4])[0]
+            if seg_len < 2:
+                break
             total_seg_len = 2 + seg_len
+            if offset + total_seg_len > size:
+                break
 
             if marker in ALLOWED_MARKERS:
                 out.extend(data[offset : offset + total_seg_len])
@@ -145,7 +155,11 @@ class MetadataCleaner:
                 break
 
             if chunk_fourcc not in METADATA_CHUNKS:
-                out_chunks.extend(data[offset : offset + total_len])
+                chunk_bytes = bytearray(data[offset : offset + total_len])
+                if chunk_fourcc == b"VP8X" and len(chunk_bytes) >= 12:
+                    # Clear ICCP (0x20), EXIF (0x08), and XMP (0x04) feature flags in VP8X header
+                    chunk_bytes[8] &= ~0x2C
+                out_chunks.extend(chunk_bytes)
 
             offset += total_len
 
