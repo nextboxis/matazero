@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List, Tuple
 from imgint.core.container.base import ContainerReader
 from imgint.core.model.record import StructuralUnit, MetadataBlock, Diagnostic
-from imgint.core.source.reader import BoundedReader
+from imgint.core.source.reader import BoundedReader, SourceBoundsError
 
 
 class GifContainerReader(ContainerReader):
@@ -55,20 +55,29 @@ class GifContainerReader(ContainerReader):
 
         offset = 13
         if has_gct and gct_size > 0:
+            actual_gct = min(gct_size, max(0, reader.size - offset))
             units.append(
                 StructuralUnit(
                     name="GCT",
                     offset=offset,
-                    length=gct_size,
+                    length=actual_gct,
                     data_offset=offset,
-                    data_length=gct_size,
+                    data_length=actual_gct,
                     description=f"Global Color Table ({gct_size // 3} colors)",
                 )
             )
-            offset += gct_size
+            offset += actual_gct
 
         frame_count = 0
         while offset < reader.size and reader.can_read(1, offset):
+            try:
+                reader.check_unit_budget()
+            except SourceBoundsError as e:
+                diagnostics.append(
+                    Diagnostic(level="warning", message=str(e), source="gif_reader", offset=offset)
+                )
+                break
+
             intro = reader.read_bytes(offset, 1)
             if not intro:
                 break
