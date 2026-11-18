@@ -81,7 +81,14 @@ class PngContainerReader(ContainerReader):
                 )
                 data_length = max(0, size - data_offset - 4)
 
-            payload_bytes = reader.read_bytes(data_offset, data_length)
+            METADATA_CHUNKS = {"eXIf", "tEXt", "zTXt", "iTXt", "iCCP", "tIME", "pHYs", "cHRM", "gAMA", "sRGB"}
+            if chunk_type in METADATA_CHUNKS:
+                read_len = min(data_length, reader.max_read_size)
+                payload_bytes = reader.read_bytes(data_offset, read_len) if read_len > 0 else b""
+                unit_payload = payload_bytes[:4096]
+            else:
+                unit_payload = reader.read_bytes(data_offset, min(data_length, 4096)) if data_length > 0 else b""
+                payload_bytes = unit_payload
 
             unit = StructuralUnit(
                 name=chunk_type,
@@ -90,7 +97,7 @@ class PngContainerReader(ContainerReader):
                 data_offset=data_offset,
                 data_length=data_length,
                 description=f"PNG Chunk {chunk_type}",
-                payload=payload_bytes,
+                payload=unit_payload,
             )
             units.append(unit)
 
